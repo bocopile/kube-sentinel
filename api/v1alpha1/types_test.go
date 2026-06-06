@@ -163,6 +163,25 @@ func TestSecurityAgentCRDSchemaRequiresTopLevelSpecFields(t *testing.T) {
 	}
 }
 
+func TestSecurityAgentCRDSchemaRequiresSpecObjectForManifestFields(t *testing.T) {
+	root := moduleRoot(t)
+	crdPath := filepath.Join(root, "config", "crd", "bases", "securityagents.kube-sentinel.io_securityagents.yaml")
+
+	manifest, err := os.ReadFile(crdPath)
+	if err != nil {
+		t.Fatalf("SecurityAgent CRD manifest must exist at %s so manifest spec fields are pinned: %v", crdPath, err)
+	}
+
+	crd := string(manifest)
+	if !strings.Contains(crd, "\n          spec:\n") {
+		t.Fatalf("SecurityAgent CRD schema must expose the top-level spec object for manifest fields")
+	}
+
+	if !strings.Contains(crd, "\n        required:\n        - spec\n") {
+		t.Fatalf("SecurityAgent CRD schema must require spec so manifests expose spec.global, spec.features, spec.output, spec.override, and spec.tests")
+	}
+}
+
 func TestSecurityAgentCRDIsClusterScoped(t *testing.T) {
 	root := moduleRoot(t)
 	crdPath := filepath.Join(root, "config", "crd", "bases", "securityagents.kube-sentinel.io_securityagents.yaml")

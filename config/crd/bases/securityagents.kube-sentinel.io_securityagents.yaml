@@ -96,3 +96,5 @@ spec:
             properties:
               phase:
                 type: string
+        required:
+        - spec
