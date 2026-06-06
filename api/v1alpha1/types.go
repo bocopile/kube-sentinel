@@ -2,10 +2,15 @@ package v1alpha1
 
 // SecurityAgentSpec defines the desired state of SecurityAgent.
 type SecurityAgentSpec struct {
+	// +kubebuilder:validation:Required
 	Global   GlobalConfig   `json:"global"`
+	// +kubebuilder:validation:Required
 	Features FeaturesConfig `json:"features"`
+	// +kubebuilder:validation:Required
 	Output   OutputConfig   `json:"output"`
+	// +kubebuilder:validation:Required
 	Override OverrideConfig `json:"override"`
+	// +kubebuilder:validation:Required
 	Tests    TestsConfig    `json:"tests"`
 }
 

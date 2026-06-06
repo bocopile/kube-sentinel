@@ -89,6 +89,46 @@ func TestSecurityAgentSpecRequiredAPIFieldsAreNotMarkedOmitEmpty(t *testing.T) {
 	}
 }
 
+func TestSecurityAgentSpecRequiredAPIFieldsHaveKubebuilderValidationMarkers(t *testing.T) {
+	root := moduleRoot(t)
+	typesPath := filepath.Join(root, "api", "v1alpha1", "types.go")
+
+	source, err := os.ReadFile(typesPath)
+	if err != nil {
+		t.Fatalf("read SecurityAgent API types from %s: %v", typesPath, err)
+	}
+
+	specFields := map[string]string{
+		"Global":   "json:\"global\"",
+		"Features": "json:\"features\"",
+		"Output":   "json:\"output\"",
+		"Override": "json:\"override\"",
+		"Tests":    "json:\"tests\"",
+	}
+
+	lines := strings.Split(string(source), "\n")
+	for fieldName, jsonTag := range specFields {
+		fieldLine := -1
+		for lineIndex, line := range lines {
+			if strings.Contains(line, fieldName) && strings.Contains(line, jsonTag) {
+				fieldLine = lineIndex
+				break
+			}
+		}
+		if fieldLine == -1 {
+			t.Fatalf("SecurityAgentSpec must expose %s with %s", fieldName, jsonTag)
+		}
+
+		markerLine := fieldLine - 1
+		for markerLine >= 0 && strings.TrimSpace(lines[markerLine]) == "" {
+			markerLine--
+		}
+		if markerLine < 0 || strings.TrimSpace(lines[markerLine]) != "// +kubebuilder:validation:Required" {
+			t.Fatalf("SecurityAgentSpec.%s must be marked required so manifests expose spec.%s in the generated API schema", fieldName, strings.Split(jsonTag, "\"")[1])
+		}
+	}
+}
+
 func TestSecurityAgentResourceSpecIsRequiredForManifestFields(t *testing.T) {
 	resourceType := reflect.TypeOf(v1alpha1.SecurityAgent{})
 	specField, ok := fieldByJSONName(resourceType, "spec")
