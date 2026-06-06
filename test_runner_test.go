@@ -30,7 +30,7 @@ func TestGoTestAllPackagesPasses(t *testing.T) {
 		t.Fatalf("go test ./... failed: %v\n%s", err, output)
 	}
 
-	if strings.Contains(output, "[no test files]") {
+	if strings.Contains(output, "[no test files]") || strings.Contains(output, "[no tests to run]") {
 		t.Fatalf("go test ./... must pass concrete package test suites, but some packages have no tests:\n%s", output)
 	}
 }
