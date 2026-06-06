@@ -1,0 +1,58 @@
+package v1alpha1
+
+// SecurityAgentSpec defines the desired state of SecurityAgent.
+type SecurityAgentSpec struct {
+	Global   GlobalConfig   `json:"global,omitempty"`
+	Features FeaturesConfig `json:"features,omitempty"`
+	Output   OutputConfig   `json:"output,omitempty"`
+	Override OverrideConfig `json:"override,omitempty"`
+	Tests    TestsConfig    `json:"tests,omitempty"`
+}
+
+// GlobalConfig holds global settings for the security agent.
+type GlobalConfig struct {
+	Enabled         bool   `json:"enabled,omitempty"`
+	TargetNamespace string `json:"targetNamespace,omitempty"`
+}
+
+// FeaturesConfig enables or disables individual features.
+type FeaturesConfig struct {
+	PodSecurity    bool `json:"podSecurity,omitempty"`
+	NetworkPolicy  bool `json:"networkPolicy,omitempty"`
+	SecretScanning bool `json:"secretScanning,omitempty"`
+}
+
+// OutputConfig controls how findings are reported.
+type OutputConfig struct {
+	Format    string `json:"format,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+	ConfigMap string `json:"configMap,omitempty"`
+}
+
+// OverrideConfig allows per-namespace or per-workload policy overrides.
+type OverrideConfig struct {
+	Namespaces []string          `json:"namespaces,omitempty"`
+	Labels     map[string]string `json:"labels,omitempty"`
+}
+
+// TestsConfig holds configuration for compliance test suites.
+type TestsConfig struct {
+	Enabled bool     `json:"enabled,omitempty"`
+	Suites  []string `json:"suites,omitempty"`
+}
+
+// SecurityAgentStatus defines the observed state of SecurityAgent.
+type SecurityAgentStatus struct {
+	Phase string `json:"phase,omitempty"`
+}
+
+type (
+	// +kubebuilder:object:root=true
+	// +kubebuilder:subresource:status
+	// +kubebuilder:resource:scope=Cluster
+	// SecurityAgent is the schema for the securityagents API.
+	SecurityAgent struct {
+		Spec   SecurityAgentSpec   `json:"spec,omitempty"`
+		Status SecurityAgentStatus `json:"status,omitempty"`
+	}
+)
