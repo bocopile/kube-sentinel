@@ -7,7 +7,21 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/bhshin/kube-sentinel/api/v1alpha1"
+	"github.com/bhshin/kube-sentinel/internal/controller"
 )
+
+func TestReconcileReturnsWithoutErrorForSecurityAgentResource(t *testing.T) {
+	t.Parallel()
+
+	reconciler := &controller.SecurityAgentReconciler{}
+	agent := &v1alpha1.SecurityAgent{}
+
+	if err := reconciler.Reconcile(agent); err != nil {
+		t.Fatalf("Reconcile returned an error for a SecurityAgent resource: %v", err)
+	}
+}
 
 func TestControllerScopesNamespacedWorkloadOperationsToGlobalTargetNamespace(t *testing.T) {
 	t.Parallel()
@@ -16,6 +30,7 @@ func TestControllerScopesNamespacedWorkloadOperationsToGlobalTargetNamespace(t *
 	trackedNamespaceValues := map[string]bool{}
 	readsGlobalTargetNamespace := false
 	scopesOperationWithGlobalTargetNamespace := false
+	scopesWorkloadOperationWithGlobalTargetNamespace := false
 
 	for _, file := range files {
 		ast.Inspect(file, func(node ast.Node) bool {
@@ -57,6 +72,9 @@ func TestControllerScopesNamespacedWorkloadOperationsToGlobalTargetNamespace(t *
 				}
 			case *ast.CallExpr:
 				if !isInNamespaceCall(node) {
+					if namespacedWorkloadOperationUsesGlobalTargetNamespace(node, trackedNamespaceValues) {
+						scopesWorkloadOperationWithGlobalTargetNamespace = true
+					}
 					break
 				}
 
@@ -86,6 +104,9 @@ func TestControllerScopesNamespacedWorkloadOperationsToGlobalTargetNamespace(t *
 	}
 	if !scopesOperationWithGlobalTargetNamespace {
 		t.Errorf("controller must pass spec.global.targetNamespace into namespaced workload operations, such as client.InNamespace(targetNamespace) for list calls or Namespace: targetNamespace for workload objects")
+	}
+	if !scopesWorkloadOperationWithGlobalTargetNamespace {
+		t.Errorf("controller must use spec.global.targetNamespace on a real namespaced workload operation, not only compute or store the namespace value")
 	}
 }
 
@@ -154,6 +175,81 @@ func trackAssignedIdentifier(expression ast.Expr, trackedNamespaceValues map[str
 func isInNamespaceCall(call *ast.CallExpr) bool {
 	path := selectorPath(call.Fun)
 	return path == "InNamespace" || strings.HasSuffix(path, ".InNamespace")
+}
+
+func namespacedWorkloadOperationUsesGlobalTargetNamespace(call *ast.CallExpr, trackedNamespaceValues map[string]bool) bool {
+	if !isWorkloadOperationCall(call) {
+		return false
+	}
+
+	for _, argument := range call.Args {
+		if expressionContainsGlobalTargetNamespace(argument, trackedNamespaceValues) {
+			return true
+		}
+		if inNamespaceArgumentContainsGlobalTargetNamespace(argument, trackedNamespaceValues) {
+			return true
+		}
+		if namespaceCompositeContainsGlobalTargetNamespace(argument, trackedNamespaceValues) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isWorkloadOperationCall(call *ast.CallExpr) bool {
+	path := selectorPath(call.Fun)
+	for _, operation := range []string{".List", ".Get", ".Create", ".Update", ".Patch", ".Delete", ".DeleteAllOf"} {
+		if strings.HasSuffix(path, operation) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func inNamespaceArgumentContainsGlobalTargetNamespace(expression ast.Expr, trackedNamespaceValues map[string]bool) bool {
+	call, ok := expression.(*ast.CallExpr)
+	if !ok || !isInNamespaceCall(call) {
+		return false
+	}
+
+	for _, argument := range call.Args {
+		if expressionContainsGlobalTargetNamespace(argument, trackedNamespaceValues) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func namespaceCompositeContainsGlobalTargetNamespace(expression ast.Expr, trackedNamespaceValues map[string]bool) bool {
+	found := false
+	ast.Inspect(expression, func(node ast.Node) bool {
+		if found {
+			return false
+		}
+
+		composite, ok := node.(*ast.CompositeLit)
+		if !ok {
+			return true
+		}
+
+		for _, element := range composite.Elts {
+			keyValue, ok := element.(*ast.KeyValueExpr)
+			if !ok || !namespaceKey(keyValue.Key) {
+				continue
+			}
+			if expressionContainsGlobalTargetNamespace(keyValue.Value, trackedNamespaceValues) {
+				found = true
+				return false
+			}
+		}
+
+		return true
+	})
+
+	return found
 }
 
 func namespaceSelector(expression ast.Expr) bool {

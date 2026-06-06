@@ -9,7 +9,7 @@ type SecurityAgentReconciler struct{}
 
 // Reconcile processes a SecurityAgent, scoping all workload operations to
 // spec.global.targetNamespace so cluster-wide resources are not accidentally mutated.
-func (r *SecurityAgentReconciler) Reconcile(agent v1alpha1.SecurityAgent) error {
+func (r *SecurityAgentReconciler) Reconcile(agent *v1alpha1.SecurityAgent) error {
 	targetNamespace := agent.Spec.Global.TargetNamespace
 	r.List(InNamespace(targetNamespace))
 	return nil
