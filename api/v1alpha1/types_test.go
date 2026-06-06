@@ -112,6 +112,18 @@ func TestSecurityAgentCRDIsClusterScoped(t *testing.T) {
 	}
 }
 
+func TestSecurityAgentResourceMetadataIsNotANamespaceRestriction(t *testing.T) {
+	resourceType := reflect.TypeOf(v1alpha1.SecurityAgent{})
+
+	if _, ok := fieldByJSONName(resourceType, "metadata"); !ok {
+		t.Fatalf("SecurityAgent resource must expose Kubernetes metadata separately from spec/status so the resource itself is not scoped through a namespace field")
+	}
+
+	if _, ok := fieldByJSONName(resourceType, "namespace"); ok {
+		t.Fatalf("SecurityAgent resource must not expose a top-level namespace field; cluster scope belongs to the CRD, not a namespace restriction on the resource itself")
+	}
+}
+
 func fieldByJSONName(specType reflect.Type, jsonName string) (reflect.StructField, bool) {
 	for i := 0; i < specType.NumField(); i++ {
 		field := specType.Field(i)

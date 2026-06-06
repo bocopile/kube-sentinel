@@ -46,13 +46,21 @@ type SecurityAgentStatus struct {
 	Phase string `json:"phase,omitempty"`
 }
 
+// ResourceMeta holds Kubernetes resource metadata (name, labels, annotations).
+type ResourceMeta struct {
+	Name        string            `json:"name,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
 type (
 	// +kubebuilder:object:root=true
 	// +kubebuilder:subresource:status
 	// +kubebuilder:resource:scope=Cluster
 	// SecurityAgent is the schema for the securityagents API.
 	SecurityAgent struct {
-		Spec   SecurityAgentSpec   `json:"spec,omitempty"`
-		Status SecurityAgentStatus `json:"status,omitempty"`
+		Metadata ResourceMeta        `json:"metadata,omitempty"`
+		Spec     SecurityAgentSpec   `json:"spec,omitempty"`
+		Status   SecurityAgentStatus `json:"status,omitempty"`
 	}
 )
