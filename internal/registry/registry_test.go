@@ -28,6 +28,22 @@ func TestUnknownFeatureNameReturnsDetectableValidationError(t *testing.T) {
 	}
 }
 
+func TestUnknownFeatureNameErrorMatchesUnrecognisedFeatureName(t *testing.T) {
+	t.Parallel()
+
+	const featureName = "not-in-feature-registry-errors-is"
+
+	err := registry.ValidateFeatureName(featureName)
+	if err == nil {
+		t.Fatalf("ValidateFeatureName(%q) returned nil error, want validation error", featureName)
+	}
+
+	want := &registry.ValidationError{FeatureName: featureName}
+	if !errors.Is(err, want) {
+		t.Fatalf("ValidateFeatureName(%q) error %v does not match %v", featureName, err, want)
+	}
+}
+
 func TestInitialisedKnownFeatureNamesRejectUnknownFeatureName(t *testing.T) {
 	knownFeatureNames := []string{
 		"known-feature-alpha",
