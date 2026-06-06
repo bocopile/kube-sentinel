@@ -72,6 +72,34 @@ func TestGoBuildAllPackagesExitsCodeZeroWithoutToolchainErrorOutput(t *testing.T
 	}
 }
 
+func TestGoBuildAllPackagesDoesNotReportCompilationErrors(t *testing.T) {
+	t.Parallel()
+
+	root := moduleRoot(t)
+	cmd := exec.Command("go", "build", "./...")
+	cmd.Dir = root
+	cmd.Env = goBuildDefaultCacheEnv()
+
+	output, err := cmd.CombinedOutput()
+	exitCode := 0
+	if err != nil {
+		exitCode = -1
+		if exitError, ok := err.(*exec.ExitError); ok {
+			exitCode = exitError.ExitCode()
+		}
+	}
+
+	if exitCode != 0 {
+		t.Fatalf("go build ./... must exit with code 0 before reporting a usable build, got %d: %v\n%s", exitCode, err, output)
+	}
+	if strings.Contains(string(output), ": error:") ||
+		strings.Contains(string(output), "undefined:") ||
+		strings.Contains(string(output), "cannot use ") ||
+		strings.Contains(string(output), "operation not permitted") {
+		t.Fatalf("go build ./... must complete without compilation or toolchain error output, got:\n%s", output)
+	}
+}
+
 func goBuildDefaultCacheEnv() []string {
 	var env []string
 	for _, variable := range os.Environ() {
