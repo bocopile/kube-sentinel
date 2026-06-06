@@ -2,11 +2,11 @@ package v1alpha1
 
 // SecurityAgentSpec defines the desired state of SecurityAgent.
 type SecurityAgentSpec struct {
-	Global   GlobalConfig   `json:"global,omitempty"`
-	Features FeaturesConfig `json:"features,omitempty"`
-	Output   OutputConfig   `json:"output,omitempty"`
-	Override OverrideConfig `json:"override,omitempty"`
-	Tests    TestsConfig    `json:"tests,omitempty"`
+	Global   GlobalConfig   `json:"global"`
+	Features FeaturesConfig `json:"features"`
+	Output   OutputConfig   `json:"output"`
+	Override OverrideConfig `json:"override"`
+	Tests    TestsConfig    `json:"tests"`
 }
 
 // GlobalConfig holds global settings for the security agent.

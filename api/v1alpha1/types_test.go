@@ -72,6 +72,23 @@ func TestSecurityAgentSpecSerializesRequiredAPIFields(t *testing.T) {
 	}
 }
 
+func TestSecurityAgentSpecRequiredAPIFieldsAreNotMarkedOmitEmpty(t *testing.T) {
+	specType := reflect.TypeOf(v1alpha1.SecurityAgentSpec{})
+
+	for _, requiredField := range []string{"global", "features", "output", "override", "tests"} {
+		field, ok := fieldByJSONName(specType, requiredField)
+		if !ok {
+			t.Fatalf("SecurityAgentSpec does not expose spec.%s", requiredField)
+		}
+
+		for _, tagOption := range strings.Split(field.Tag.Get("json"), ",")[1:] {
+			if tagOption == "omitempty" {
+				t.Fatalf("spec.%s must be exposed as a required API field, but json tag %q marks it omitempty", requiredField, field.Tag.Get("json"))
+			}
+		}
+	}
+}
+
 func TestSecurityAgentCRDIsClusterScoped(t *testing.T) {
 	root := moduleRoot(t)
 	crdPath := filepath.Join(root, "config", "crd", "bases", "securityagents.kube-sentinel.io_securityagents.yaml")
@@ -98,7 +115,7 @@ func TestSecurityAgentCRDIsClusterScoped(t *testing.T) {
 func fieldByJSONName(specType reflect.Type, jsonName string) (reflect.StructField, bool) {
 	for i := 0; i < specType.NumField(); i++ {
 		field := specType.Field(i)
-		if field.Tag.Get("json") == jsonName+",omitempty" {
+		if strings.Split(field.Tag.Get("json"), ",")[0] == jsonName {
 			return field, true
 		}
 	}
