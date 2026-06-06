@@ -30,6 +30,34 @@ func TestGoBuildAllPackages(t *testing.T) {
 	}
 }
 
+func TestGoBuildAllPackagesCompletesWithoutBuildDiagnostics(t *testing.T) {
+	t.Parallel()
+
+	root := moduleRoot(t)
+	cmd := exec.Command("go", "build", "./...")
+	cmd.Dir = root
+	cmd.Env = goBuildDefaultCacheEnv()
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("go build ./... exited non-zero: %v\n%s", err, output)
+	}
+	if len(output) > 0 {
+		t.Fatalf("go build ./... must complete without build diagnostics or compilation errors, got:\n%s", output)
+	}
+}
+
+func goBuildDefaultCacheEnv() []string {
+	var env []string
+	for _, variable := range os.Environ() {
+		if strings.HasPrefix(variable, "GOCACHE=") || strings.HasPrefix(variable, "GOMODCACHE=") {
+			continue
+		}
+		env = append(env, variable)
+	}
+	return env
+}
+
 func goListPackages(t *testing.T, root string) []string {
 	t.Helper()
 
