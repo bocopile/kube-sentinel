@@ -265,6 +265,47 @@ func TestSecurityAgentCRDNamespacedWorkloadTargetingReferencesExactSpecPath(t *t
 	}
 }
 
+func TestGlobalTargetNamespaceFieldDocumentsCRDNamespacedWorkloadTargeting(t *testing.T) {
+	root := moduleRoot(t)
+	typesPath := filepath.Join(root, "api", "v1alpha1", "types.go")
+
+	source, err := os.ReadFile(typesPath)
+	if err != nil {
+		t.Fatalf("read SecurityAgent API types from %s: %v", typesPath, err)
+	}
+
+	lines := strings.Split(string(source), "\n")
+	targetNamespaceLine := -1
+	for lineIndex, line := range lines {
+		if strings.Contains(line, "TargetNamespace") && strings.Contains(line, "json:\"targetNamespace") {
+			targetNamespaceLine = lineIndex
+			break
+		}
+	}
+	if targetNamespaceLine == -1 {
+		t.Fatalf("GlobalConfig must expose spec.global.targetNamespace for namespaced workload targeting")
+	}
+
+	fieldDocumentation := strings.Builder{}
+	for lineIndex := targetNamespaceLine - 1; lineIndex >= 0; lineIndex-- {
+		line := strings.TrimSpace(lines[lineIndex])
+		if line == "" {
+			continue
+		}
+		if !strings.HasPrefix(line, "//") {
+			break
+		}
+		fieldDocumentation.WriteString(" ")
+		fieldDocumentation.WriteString(strings.TrimSpace(strings.TrimPrefix(line, "//")))
+	}
+
+	documentation := fieldDocumentation.String()
+	if !strings.Contains(documentation, "spec.global.targetNamespace") ||
+		!strings.Contains(strings.ToLower(documentation), "namespaced workload targeting") {
+		t.Fatalf("GlobalConfig.TargetNamespace must document that the generated CRD references spec.global.targetNamespace for namespaced workload targeting, got:%s", documentation)
+	}
+}
+
 func TestSecurityAgentCRDDefinesGlobalTargetNamespaceFieldSchema(t *testing.T) {
 	root := moduleRoot(t)
 	crdPath := filepath.Join(root, "config", "crd", "bases", "securityagents.kube-sentinel.io_securityagents.yaml")

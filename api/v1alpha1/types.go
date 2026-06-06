@@ -16,7 +16,8 @@ type SecurityAgentSpec struct {
 
 // GlobalConfig holds global settings for the security agent.
 type GlobalConfig struct {
-	Enabled         bool   `json:"enabled,omitempty"`
+	Enabled bool `json:"enabled,omitempty"`
+	// spec.global.targetNamespace enables namespaced workload targeting — set this to select a specific target namespace for workload discovery and policy enforcement.
 	TargetNamespace string `json:"targetNamespace,omitempty"`
 }
 
