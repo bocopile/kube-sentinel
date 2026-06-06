@@ -110,6 +110,49 @@ func TestControllerScopesNamespacedWorkloadOperationsToGlobalTargetNamespace(t *
 	}
 }
 
+func TestControllerScopesConcreteClientWorkloadOperationToGlobalTargetNamespace(t *testing.T) {
+	t.Parallel()
+
+	files := parseControllerSource(t)
+	trackedNamespaceValues := map[string]bool{}
+	scopesConcreteClientWorkloadOperationWithGlobalTargetNamespace := false
+
+	for _, file := range files {
+		ast.Inspect(file, func(node ast.Node) bool {
+			switch node := node.(type) {
+			case *ast.AssignStmt:
+				for index, lhs := range node.Lhs {
+					if index >= len(node.Rhs) {
+						continue
+					}
+					if expressionContainsGlobalTargetNamespace(node.Rhs[index], trackedNamespaceValues) {
+						trackAssignedIdentifier(lhs, trackedNamespaceValues)
+					}
+				}
+			case *ast.ValueSpec:
+				for index, name := range node.Names {
+					if index >= len(node.Values) {
+						continue
+					}
+					if expressionContainsGlobalTargetNamespace(node.Values[index], trackedNamespaceValues) {
+						trackedNamespaceValues[name.Name] = true
+					}
+				}
+			case *ast.CallExpr:
+				if concreteClientWorkloadOperationUsesGlobalTargetNamespace(node, trackedNamespaceValues) {
+					scopesConcreteClientWorkloadOperationWithGlobalTargetNamespace = true
+				}
+			}
+
+			return true
+		})
+	}
+
+	if !scopesConcreteClientWorkloadOperationWithGlobalTargetNamespace {
+		t.Fatalf("controller must scope a concrete namespaced workload client operation to spec.global.targetNamespace; local no-op workload method stubs do not satisfy this requirement")
+	}
+}
+
 func parseControllerSource(t *testing.T) []*ast.File {
 	t.Helper()
 
@@ -206,6 +249,36 @@ func isWorkloadOperationCall(call *ast.CallExpr) bool {
 	}
 
 	return false
+}
+
+func concreteClientWorkloadOperationUsesGlobalTargetNamespace(call *ast.CallExpr, trackedNamespaceValues map[string]bool) bool {
+	if !isConcreteClientWorkloadOperationCall(call) {
+		return false
+	}
+
+	for _, argument := range call.Args {
+		if expressionContainsGlobalTargetNamespace(argument, trackedNamespaceValues) {
+			return true
+		}
+		if inNamespaceArgumentContainsGlobalTargetNamespace(argument, trackedNamespaceValues) {
+			return true
+		}
+		if namespaceCompositeContainsGlobalTargetNamespace(argument, trackedNamespaceValues) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isConcreteClientWorkloadOperationCall(call *ast.CallExpr) bool {
+	selector, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || !isWorkloadOperationCall(call) {
+		return false
+	}
+
+	receiverPath := selectorPath(selector.X)
+	return receiverPath != "" && receiverPath != "r"
 }
 
 func inNamespaceArgumentContainsGlobalTargetNamespace(expression ast.Expr, trackedNamespaceValues map[string]bool) bool {

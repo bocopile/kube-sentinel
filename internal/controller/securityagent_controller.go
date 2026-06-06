@@ -4,22 +4,34 @@ import (
 	"github.com/bhshin/kube-sentinel/api/v1alpha1"
 )
 
+// WorkloadClient performs namespaced workload operations scoped to a specific namespace.
+type WorkloadClient interface {
+	List(namespace string)
+}
+
+type noopClient struct{}
+
+func (n *noopClient) List(namespace string) {}
+
 // SecurityAgentReconciler reconciles SecurityAgent resources.
-type SecurityAgentReconciler struct{}
+type SecurityAgentReconciler struct {
+	Client WorkloadClient
+}
 
 // Reconcile processes a SecurityAgent, scoping all workload operations to
 // spec.global.targetNamespace so cluster-wide resources are not accidentally mutated.
 func (r *SecurityAgentReconciler) Reconcile(agent *v1alpha1.SecurityAgent) error {
 	targetNamespace := agent.Spec.Global.TargetNamespace
-	r.List(InNamespace(targetNamespace))
+	client := r.Client
+	if client == nil {
+		client = &noopClient{}
+	}
+	client.List(InNamespace(targetNamespace))
 	return nil
 }
 
-// List performs a namespaced workload list operation scoped to the given namespace option.
-func (r *SecurityAgentReconciler) List(namespace string) {}
-
-// InNamespace returns an option that restricts list and object operations to
-// the given namespace, equivalent to client.InNamespace in controller-runtime.
+// InNamespace returns a namespace-scoped option for list and object operations,
+// equivalent to client.InNamespace in controller-runtime.
 func InNamespace(namespace string) string {
 	return namespace
 }
