@@ -35,6 +35,32 @@ func TestGoTestAllPackagesPasses(t *testing.T) {
 	}
 }
 
+func TestGoTestAllPackagesExitsWithCodeZero(t *testing.T) {
+	t.Parallel()
+
+	if os.Getenv("KUBE_SENTINEL_GO_TEST_ALL_CHILD") == "1" {
+		return
+	}
+
+	root := projectRoot(t)
+	cmd := exec.Command("go", "test", "./...")
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(),
+		"KUBE_SENTINEL_GO_TEST_ALL_CHILD=1",
+		"GOCACHE="+filepath.Join(t.TempDir(), "go-build"),
+		"GOMODCACHE="+filepath.Join(t.TempDir(), "go-mod"),
+	)
+
+	outputBytes, err := cmd.CombinedOutput()
+	if err != nil {
+		exitCode := -1
+		if exitError, ok := err.(*exec.ExitError); ok {
+			exitCode = exitError.ExitCode()
+		}
+		t.Fatalf("go test ./... must exit with code 0, got %d: %v\n%s", exitCode, err, outputBytes)
+	}
+}
+
 func projectRoot(t *testing.T) string {
 	t.Helper()
 
