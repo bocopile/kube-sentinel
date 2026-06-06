@@ -19,7 +19,7 @@ type ValidationError struct {
 }
 
 func (e *ValidationError) Error() string {
-	return fmt.Sprintf("unrecognised feature name: %s", e.FeatureName)
+	return fmt.Sprintf(`unrecognised feature name: "%s"`, e.FeatureName)
 }
 
 func (e *ValidationError) Is(target error) bool {
