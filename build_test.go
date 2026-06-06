@@ -100,6 +100,35 @@ func TestGoBuildAllPackagesDoesNotReportCompilationErrors(t *testing.T) {
 	}
 }
 
+func TestREQP0KubeSentinelProject01GoBuildAllPackagesExitsZeroWithoutCompilationErrors(t *testing.T) {
+	t.Parallel()
+
+	root := moduleRoot(t)
+	cmd := exec.Command("go", "build", "./...")
+	cmd.Dir = root
+	cmd.Env = goBuildDefaultCacheEnv()
+
+	outputBytes, err := cmd.CombinedOutput()
+	output := string(outputBytes)
+	exitCode := 0
+	if err != nil {
+		exitCode = -1
+		if exitError, ok := err.(*exec.ExitError); ok {
+			exitCode = exitError.ExitCode()
+		}
+	}
+
+	if exitCode != 0 {
+		t.Fatalf("REQ-P0-KUBE-SENTINEL-PROJECT-01 requires go build ./... to exit with code 0, got %d: %v\n%s", exitCode, err, output)
+	}
+	if strings.Contains(output, ": error:") ||
+		strings.Contains(output, "undefined:") ||
+		strings.Contains(output, "cannot use ") ||
+		strings.Contains(output, "operation not permitted") {
+		t.Fatalf("REQ-P0-KUBE-SENTINEL-PROJECT-01 requires go build ./... to complete without compilation errors, got:\n%s", output)
+	}
+}
+
 func goBuildDefaultCacheEnv() []string {
 	var env []string
 	for _, variable := range os.Environ() {
