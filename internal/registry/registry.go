@@ -43,6 +43,17 @@ func ValidateFeatureName(name string) error {
 	return nil
 }
 
+// InitialiseKnownFeatureNames registers the given names as known features so ValidateFeatureName accepts them.
+func InitialiseKnownFeatureNames(names []string) {
+	mu.Lock()
+	defer mu.Unlock()
+	for _, name := range names {
+		if _, exists := globalFeatures[name]; !exists {
+			globalFeatures[name] = Feature{ID: name}
+		}
+	}
+}
+
 // List returns all registered features ordered by ascending priority then lexicographic ID.
 func List() []Feature {
 	mu.RLock()
