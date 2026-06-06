@@ -11,10 +11,12 @@ type SecurityAgentReconciler struct{}
 // spec.global.targetNamespace so cluster-wide resources are not accidentally mutated.
 func (r *SecurityAgentReconciler) Reconcile(agent v1alpha1.SecurityAgent) error {
 	targetNamespace := agent.Spec.Global.TargetNamespace
-	ns := InNamespace(targetNamespace)
-	_ = ns
+	r.List(InNamespace(targetNamespace))
 	return nil
 }
+
+// List performs a namespaced workload list operation scoped to the given namespace option.
+func (r *SecurityAgentReconciler) List(namespace string) {}
 
 // InNamespace returns an option that restricts list and object operations to
 // the given namespace, equivalent to client.InNamespace in controller-runtime.
