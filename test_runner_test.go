@@ -121,6 +121,38 @@ func TestREQP0KubeSentinelProject02GoTestAllPackagesExitsZeroWithAllTestsPassing
 	}
 }
 
+func TestREQP0KubeSentinelProject02GoTestAllPackagesCommandReportsOnlyPassingResults(t *testing.T) {
+	t.Parallel()
+
+	if os.Getenv("KUBE_SENTINEL_GO_TEST_ALL_CHILD") == "1" {
+		return
+	}
+
+	root := projectRoot(t)
+	cmd := exec.Command("go", "test", "./...")
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "KUBE_SENTINEL_GO_TEST_ALL_CHILD=1")
+
+	outputBytes, err := cmd.CombinedOutput()
+	output := string(outputBytes)
+	exitCode := 0
+	if err != nil {
+		exitCode = -1
+		if exitError, ok := err.(*exec.ExitError); ok {
+			exitCode = exitError.ExitCode()
+		}
+	}
+
+	if exitCode != 0 {
+		t.Fatalf("REQ-P0-KUBE-SENTINEL-PROJECT-02 requires go test ./... to exit with code 0, got %d: %v\n%s", exitCode, err, output)
+	}
+	if strings.Contains(output, "\n--- FAIL:") ||
+		strings.Contains(output, "\nFAIL\t") ||
+		strings.HasPrefix(output, "FAIL\t") {
+		t.Fatalf("REQ-P0-KUBE-SENTINEL-PROJECT-02 requires go test ./... to report only passing package results, got:\n%s", output)
+	}
+}
+
 func projectRoot(t *testing.T) string {
 	t.Helper()
 
