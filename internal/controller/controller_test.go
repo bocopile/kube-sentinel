@@ -23,6 +23,30 @@ func TestReconcileReturnsWithoutErrorForSecurityAgentResource(t *testing.T) {
 	}
 }
 
+func TestReconcileEmptyImplementationDoesNotPerformWorkloadOperations(t *testing.T) {
+	t.Parallel()
+
+	client := &recordingWorkloadClient{}
+	reconciler := &controller.SecurityAgentReconciler{Client: client}
+	agent := &v1alpha1.SecurityAgent{}
+
+	if err := reconciler.Reconcile(agent); err != nil {
+		t.Fatalf("Reconcile returned an error for a SecurityAgent resource: %v", err)
+	}
+
+	if client.listCalls != 0 {
+		t.Fatalf("Reconcile should be otherwise empty for a bare SecurityAgent resource, got %d workload list calls", client.listCalls)
+	}
+}
+
+type recordingWorkloadClient struct {
+	listCalls int
+}
+
+func (c *recordingWorkloadClient) List(namespace string) {
+	c.listCalls++
+}
+
 func TestControllerScopesNamespacedWorkloadOperationsToGlobalTargetNamespace(t *testing.T) {
 	t.Parallel()
 

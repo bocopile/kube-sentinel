@@ -20,8 +20,12 @@ type SecurityAgentReconciler struct {
 
 // Reconcile processes a SecurityAgent, scoping all workload operations to
 // spec.global.targetNamespace so cluster-wide resources are not accidentally mutated.
+// A bare resource with no targetNamespace configured is a no-op.
 func (r *SecurityAgentReconciler) Reconcile(agent *v1alpha1.SecurityAgent) error {
 	targetNamespace := agent.Spec.Global.TargetNamespace
+	if targetNamespace == "" {
+		return nil
+	}
 	client := r.Client
 	if client == nil {
 		client = &noopClient{}
