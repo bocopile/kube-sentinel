@@ -1,0 +1,91 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: securityagents.kube-sentinel.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+spec:
+  group: kube-sentinel.io
+  names:
+    kind: SecurityAgent
+    listKind: SecurityAgentList
+    plural: securityagents
+    singular: securityagent
+  scope: Cluster
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    schema:
+      openAPIV3Schema:
+        description: SecurityAgent is the schema for the securityagents API.
+        type: object
+        properties:
+          apiVersion:
+            type: string
+          kind:
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SecurityAgentSpec defines the desired state of SecurityAgent.
+            type: object
+            properties:
+              global:
+                description: GlobalConfig holds global settings for the security agent.
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  targetNamespace:
+                    type: string
+              features:
+                description: FeaturesConfig enables or disables individual features.
+                type: object
+                properties:
+                  podSecurity:
+                    type: boolean
+                  networkPolicy:
+                    type: boolean
+                  secretScanning:
+                    type: boolean
+              output:
+                description: OutputConfig controls how findings are reported.
+                type: object
+                properties:
+                  configMap:
+                    type: string
+                  format:
+                    type: string
+                  namespace:
+                    type: string
+              override:
+                description: OverrideConfig allows per-namespace or per-workload policy overrides.
+                type: object
+                properties:
+                  labels:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  namespaces:
+                    items:
+                      type: string
+                    type: array
+              tests:
+                description: TestsConfig holds configuration for compliance test suites.
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  suites:
+                    items:
+                      type: string
+                    type: array
+          status:
+            description: SecurityAgentStatus defines the observed state of SecurityAgent.
+            type: object
+            properties:
+              phase:
+                type: string
