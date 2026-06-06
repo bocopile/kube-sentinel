@@ -28,6 +28,34 @@ func TestUnknownFeatureNameReturnsDetectableValidationError(t *testing.T) {
 	}
 }
 
+func TestInitialisedKnownFeatureNamesRejectUnknownFeatureName(t *testing.T) {
+	knownFeatureNames := []string{
+		"known-feature-alpha",
+		"known-feature-beta",
+	}
+	registry.InitialiseKnownFeatureNames(knownFeatureNames)
+
+	const knownFeatureName = "known-feature-alpha"
+	if err := registry.ValidateFeatureName(knownFeatureName); err != nil {
+		t.Fatalf("ValidateFeatureName(%q) returned error %v, want nil", knownFeatureName, err)
+	}
+
+	const unknownFeatureName = "known-feature-gamma"
+	err := registry.ValidateFeatureName(unknownFeatureName)
+	if err == nil {
+		t.Fatalf("ValidateFeatureName(%q) returned nil error, want validation error", unknownFeatureName)
+	}
+
+	var validationError *registry.ValidationError
+	if !errors.As(err, &validationError) {
+		t.Fatalf("ValidateFeatureName(%q) error %T is not detectable as *registry.ValidationError", unknownFeatureName, err)
+	}
+
+	if validationError.FeatureName != unknownFeatureName {
+		t.Fatalf("validation error feature name = %q, want %q", validationError.FeatureName, unknownFeatureName)
+	}
+}
+
 func TestListReturnsFeaturesInDeterministicPriorityThenIDOrder(t *testing.T) {
 	features := []registry.Feature{
 		{ID: "test-registry-order-zeta", Priority: 20},
