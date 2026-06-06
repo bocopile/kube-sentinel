@@ -217,6 +217,35 @@ func TestSecurityAgentCRDReferencesGlobalTargetNamespaceForNamespacedWorkloadTar
 	}
 }
 
+func TestSecurityAgentCRDNamespacedWorkloadTargetingReferencesExactSpecPath(t *testing.T) {
+	root := moduleRoot(t)
+	crdPath := filepath.Join(root, "config", "crd", "bases", "securityagents.kube-sentinel.io_securityagents.yaml")
+
+	manifest, err := os.ReadFile(crdPath)
+	if err != nil {
+		t.Fatalf("SecurityAgent CRD manifest must exist at %s so spec.global.targetNamespace workload targeting is pinned: %v", crdPath, err)
+	}
+
+	crd := string(manifest)
+	if !strings.Contains(crd, "\n  scope: Cluster\n") {
+		t.Fatalf("SecurityAgent CRD must be cluster-scoped when registered with the cluster")
+	}
+
+	targetNamespaceIndex := strings.Index(crd, "\n                  targetNamespace:\n")
+	if targetNamespaceIndex == -1 {
+		t.Fatalf("SecurityAgent CRD schema must expose spec.global.targetNamespace for namespaced workload targeting")
+	}
+
+	targetNamespaceSchema := crd[targetNamespaceIndex:]
+	if featuresIndex := strings.Index(targetNamespaceSchema, "\n              features:\n"); featuresIndex != -1 {
+		targetNamespaceSchema = targetNamespaceSchema[:featuresIndex]
+	}
+
+	if !strings.Contains(targetNamespaceSchema, "spec.global.targetNamespace") {
+		t.Fatalf("SecurityAgent CRD namespaced workload targeting guidance must reference spec.global.targetNamespace exactly, got:\n%s", targetNamespaceSchema)
+	}
+}
+
 func TestSecurityAgentCRDDefinesGlobalTargetNamespaceFieldSchema(t *testing.T) {
 	root := moduleRoot(t)
 	crdPath := filepath.Join(root, "config", "crd", "bases", "securityagents.kube-sentinel.io_securityagents.yaml")
