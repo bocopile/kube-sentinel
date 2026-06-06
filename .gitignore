@@ -30,3 +30,6 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# orchestrator — generated artifacts (specs, checkpoints, run logs)
+.orchestrator/
