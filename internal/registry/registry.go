@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -19,6 +20,14 @@ type ValidationError struct {
 
 func (e *ValidationError) Error() string {
 	return fmt.Sprintf("unrecognised feature name: %q", e.FeatureName)
+}
+
+func (e *ValidationError) Is(target error) bool {
+	var t *ValidationError
+	if errors.As(target, &t) {
+		return e.FeatureName == t.FeatureName
+	}
+	return false
 }
 
 var (

@@ -34,15 +34,13 @@ spec:
             type: object
             properties:
               global:
-                description: GlobalConfig holds global settings for the security agent.
                 type: object
                 properties:
                   enabled:
                     type: boolean
                   targetNamespace:
-                    type: string
+                description: GlobalConfig holds global settings for the security agent; targetNamespace enables namespaced workload targeting.
               features:
-                description: FeaturesConfig enables or disables individual features.
                 type: object
                 properties:
                   podSecurity:
@@ -51,8 +49,8 @@ spec:
                     type: boolean
                   secretScanning:
                     type: boolean
+                description: FeaturesConfig enables or disables individual features.
               output:
-                description: OutputConfig controls how findings are reported.
                 type: object
                 properties:
                   configMap:
@@ -61,8 +59,8 @@ spec:
                     type: string
                   namespace:
                     type: string
+                description: OutputConfig controls how findings are reported.
               override:
-                description: OverrideConfig allows per-namespace or per-workload policy overrides.
                 type: object
                 properties:
                   labels:
@@ -73,8 +71,8 @@ spec:
                     items:
                       type: string
                     type: array
+                description: OverrideConfig allows per-namespace or per-workload policy overrides.
               tests:
-                description: TestsConfig holds configuration for compliance test suites.
                 type: object
                 properties:
                   enabled:
@@ -83,6 +81,13 @@ spec:
                     items:
                       type: string
                     type: array
+                description: TestsConfig holds configuration for compliance test suites.
+            required:
+            - global
+            - features
+            - output
+            - override
+            - tests
           status:
             description: SecurityAgentStatus defines the observed state of SecurityAgent.
             type: object
