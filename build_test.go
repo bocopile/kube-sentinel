@@ -47,6 +47,31 @@ func TestGoBuildAllPackagesCompletesWithoutBuildDiagnostics(t *testing.T) {
 	}
 }
 
+func TestGoBuildAllPackagesExitsCodeZeroWithoutToolchainErrorOutput(t *testing.T) {
+	t.Parallel()
+
+	root := moduleRoot(t)
+	cmd := exec.Command("go", "build", "./...")
+	cmd.Dir = root
+	cmd.Env = goBuildDefaultCacheEnv()
+
+	output, err := cmd.CombinedOutput()
+	exitCode := 0
+	if err != nil {
+		exitCode = -1
+		if exitError, ok := err.(*exec.ExitError); ok {
+			exitCode = exitError.ExitCode()
+		}
+	}
+
+	if exitCode != 0 {
+		t.Fatalf("go build ./... must exit with code 0, got %d: %v\n%s", exitCode, err, output)
+	}
+	if len(output) > 0 {
+		t.Fatalf("go build ./... must not emit build toolchain errors or compilation diagnostics, got:\n%s", output)
+	}
+}
+
 func goBuildDefaultCacheEnv() []string {
 	var env []string
 	for _, variable := range os.Environ() {
