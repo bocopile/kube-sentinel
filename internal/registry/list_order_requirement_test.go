@@ -39,3 +39,34 @@ func TestRegisteredFeaturesAreListedByAscendingPriorityThenLexicographicID(t *te
 		t.Fatalf("List() ordered registered features = %#v, want %#v", got, want)
 	}
 }
+
+func TestRegisteredFeaturesWithDistinctPrioritiesAreListedByAscendingPriority(t *testing.T) {
+	features := []registry.Feature{
+		{ID: "req-06-distinct-zeta", Priority: 90},
+		{ID: "req-06-distinct-alpha", Priority: 30},
+		{ID: "req-06-distinct-delta", Priority: 60},
+	}
+
+	registeredIDs := make(map[string]bool, len(features))
+	for _, feature := range features {
+		registeredIDs[feature.ID] = true
+		registry.Register(feature.ID, feature.Priority)
+	}
+
+	var got []registry.Feature
+	for _, feature := range registry.List() {
+		if registeredIDs[feature.ID] {
+			got = append(got, feature)
+		}
+	}
+
+	want := []registry.Feature{
+		{ID: "req-06-distinct-alpha", Priority: 30},
+		{ID: "req-06-distinct-delta", Priority: 60},
+		{ID: "req-06-distinct-zeta", Priority: 90},
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("List() ordered registered features = %#v, want %#v", got, want)
+	}
+}
