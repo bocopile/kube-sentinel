@@ -60,7 +60,7 @@ type (
 	// SecurityAgent is the schema for the securityagents API.
 	SecurityAgent struct {
 		Metadata ResourceMeta        `json:"metadata,omitempty"`
-		Spec     SecurityAgentSpec   `json:"spec,omitempty"`
+		Spec     SecurityAgentSpec   `json:"spec"`
 		Status   SecurityAgentStatus `json:"status,omitempty"`
 	}
 )

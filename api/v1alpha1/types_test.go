@@ -89,6 +89,20 @@ func TestSecurityAgentSpecRequiredAPIFieldsAreNotMarkedOmitEmpty(t *testing.T) {
 	}
 }
 
+func TestSecurityAgentResourceSpecIsRequiredForManifestFields(t *testing.T) {
+	resourceType := reflect.TypeOf(v1alpha1.SecurityAgent{})
+	specField, ok := fieldByJSONName(resourceType, "spec")
+	if !ok {
+		t.Fatalf("SecurityAgent resource must expose spec so manifests can define required top-level spec fields")
+	}
+
+	for _, tagOption := range strings.Split(specField.Tag.Get("json"), ",")[1:] {
+		if tagOption == "omitempty" {
+			t.Fatalf("SecurityAgent spec must not be optional because manifests must expose spec.global, spec.features, spec.output, spec.override, and spec.tests; got json tag %q", specField.Tag.Get("json"))
+		}
+	}
+}
+
 func TestSecurityAgentCRDSchemaRequiresTopLevelSpecFields(t *testing.T) {
 	root := moduleRoot(t)
 	crdPath := filepath.Join(root, "config", "crd", "bases", "securityagents.kube-sentinel.io_securityagents.yaml")
