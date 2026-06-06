@@ -161,9 +161,10 @@ func TestSecurityAgentCRDReferencesGlobalTargetNamespaceForNamespacedWorkloadTar
 		t.Fatalf("SecurityAgent CRD schema must expose spec.global.targetNamespace for namespaced workload targeting")
 	}
 
+	// Scope to the global section (ends at features: sibling key at 14-space indentation)
 	targetNamespaceSchema := crd[targetNamespaceIndex:]
-	if nextPropertyIndex := strings.Index(targetNamespaceSchema[1:], "\n                  "); nextPropertyIndex != -1 {
-		targetNamespaceSchema = targetNamespaceSchema[:nextPropertyIndex+1]
+	if featuresIndex := strings.Index(targetNamespaceSchema, "\n              features:\n"); featuresIndex != -1 {
+		targetNamespaceSchema = targetNamespaceSchema[:featuresIndex]
 	}
 
 	if !strings.Contains(targetNamespaceSchema, "description:") {
@@ -171,6 +172,42 @@ func TestSecurityAgentCRDReferencesGlobalTargetNamespaceForNamespacedWorkloadTar
 	}
 
 	description := strings.ToLower(targetNamespaceSchema)
+	if !strings.Contains(description, "namespaced workload") || !strings.Contains(description, "target") {
+		t.Fatalf("SecurityAgent CRD schema description for spec.global.targetNamespace must reference namespaced workload targeting, got:\n%s", targetNamespaceSchema)
+	}
+}
+
+func TestSecurityAgentCRDDefinesGlobalTargetNamespaceFieldSchema(t *testing.T) {
+	root := moduleRoot(t)
+	crdPath := filepath.Join(root, "config", "crd", "bases", "securityagents.kube-sentinel.io_securityagents.yaml")
+
+	manifest, err := os.ReadFile(crdPath)
+	if err != nil {
+		t.Fatalf("SecurityAgent CRD manifest must exist at %s so spec.global.targetNamespace field schema is pinned: %v", crdPath, err)
+	}
+
+	crd := string(manifest)
+	targetNamespaceIndex := strings.Index(crd, "\n                  targetNamespace:\n")
+	if targetNamespaceIndex == -1 {
+		t.Fatalf("SecurityAgent CRD schema must expose spec.global.targetNamespace for namespaced workload targeting")
+	}
+
+	// Scope to the global section (ends at features: sibling key at 14-space indentation)
+	targetNamespaceSchema := crd[targetNamespaceIndex:]
+	if featuresIndex := strings.Index(targetNamespaceSchema, "\n              features:\n"); featuresIndex != -1 {
+		targetNamespaceSchema = targetNamespaceSchema[:featuresIndex]
+	}
+
+	if !strings.Contains(targetNamespaceSchema, "\n                    type: string\n") {
+		t.Fatalf("SecurityAgent CRD schema must define spec.global.targetNamespace as a string field, got:\n%s", targetNamespaceSchema)
+	}
+
+	descriptionIndex := strings.Index(targetNamespaceSchema, "\n                    description:")
+	if descriptionIndex == -1 {
+		t.Fatalf("SecurityAgent CRD schema must describe spec.global.targetNamespace directly, got:\n%s", targetNamespaceSchema)
+	}
+
+	description := strings.ToLower(targetNamespaceSchema[descriptionIndex:])
 	if !strings.Contains(description, "namespaced workload") || !strings.Contains(description, "target") {
 		t.Fatalf("SecurityAgent CRD schema description for spec.global.targetNamespace must reference namespaced workload targeting, got:\n%s", targetNamespaceSchema)
 	}

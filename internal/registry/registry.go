@@ -25,6 +25,9 @@ func (e *ValidationError) Error() string {
 func (e *ValidationError) Is(target error) bool {
 	var t *ValidationError
 	if errors.As(target, &t) {
+		if t.FeatureName == "" {
+			return true
+		}
 		return e.FeatureName == t.FeatureName
 	}
 	return false

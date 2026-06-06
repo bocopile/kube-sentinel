@@ -39,7 +39,9 @@ spec:
                   enabled:
                     type: boolean
                   targetNamespace:
-                description: GlobalConfig holds global settings for the security agent; targetNamespace enables namespaced workload targeting.
+                    type: string
+                    description: namespaced workload targeting enables selecting a specific target namespace for workload discovery and policy enforcement
+                description: GlobalConfig holds global settings for the security agent.
               features:
                 type: object
                 properties:
