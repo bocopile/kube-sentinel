@@ -33,3 +33,5 @@ go.work.sum
 
 # orchestrator — generated artifacts (specs, checkpoints, run logs)
 .orchestrator/
+.idea/
+.claude/
