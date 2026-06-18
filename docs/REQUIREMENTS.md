@@ -15,7 +15,7 @@ remote apply/read-only access, and publish results to Grafana LGTM.
 | G2 | Feature toggles create or remove each feature's managed resources. | Patch `spec.features[].enabled` and verify resource creation/deletion. |
 | G3 | Overrides can change resources and scheduling fields for selected features. | Patch `spec.override`, then inspect generated workload specs. |
 | G4 | OSquery, Trivy, and security assessment data lands in CTEM-specific LGTM streams and metrics. | Query Loki streams and Mimir counters for inventory, vulnerabilities, and findings. |
-| G5 | Grafana dashboards expose event, inventory, vulnerability, and final-check security assessment views. | Capture dashboard screenshots. |
+| G5 | Grafana dashboards expose finding, inventory, vulnerability, scan health, and final-check security assessment views. | Capture dashboard screenshots. |
 | G6 | Final Check Dashboard exposes the assessment result by decision-oriented menus. | Capture dashboard screenshots. |
 | G7 | CTEM mapping checklist passes for Scope, Discovery, Priority, and Validation. | Fill and review `docs/ctem-mapping-results.md`. |
 | G8 | Source code static analysis identifies risky code and security anti-patterns. | Review Semgrep/gosec reports. |
@@ -42,7 +42,7 @@ remote apply/read-only access, and publish results to Grafana LGTM.
 - Server-side apply for Mgmt-local and Biz-remote Kubernetes resources.
 - Status reporting for feature readiness, config errors, apply errors, and degraded runtime state.
 - OTel Node Collector and Gateway configuration generation.
-- Grafana LGTM routing for events, inventory, vulnerabilities, and normalized security findings.
+- Grafana LGTM routing for inventory, vulnerabilities, scan health, and normalized security findings.
 - Delivery artifact security assessment for source, secret, image, SBOM, integrity, Kubernetes manifest, RBAC, Dockerfile, and script risks.
 - Applied cluster configuration assessment for Pod security settings, RBAC, Secret references, ServiceAccount token behavior, and Service/Ingress exposure.
 - Separate scan phases for Code / Artifact Scan and Biz Cluster Scan so artifact failures, cluster connectivity failures, RBAC denied errors, and skipped cluster scans are not conflated.

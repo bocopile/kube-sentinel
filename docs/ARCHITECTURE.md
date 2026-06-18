@@ -84,7 +84,7 @@ Each Biz Cluster must provide:
 
 | Prerequisite | Purpose |
 | --- | --- |
-| `kube-sentinel-system` namespace | Default namespace for remote resources. |
+| `kube-sentinel-system` namespace | Default namespace for remote resources. It is created by a platform/bootstrap step before scans. |
 | target kubeconfig or ServiceAccount token | Stored in the Mgmt Cluster and used by the management controller for remote apply. |
 | bootstrap RBAC | Grants only the verbs/resources needed by enabled features. |
 | image pull access | Pull scanner and optional collector images. |
@@ -103,6 +103,18 @@ Required target RBAC should be split by capability:
 
 The target kubeconfig Secret is the most sensitive Mgmt Cluster asset. It
 requires encryption at rest, narrow RBAC, rotation, and audit logging.
+
+Namespace ownership decision:
+
+- Default PoC behavior: the Biz Cluster `targetNamespace` is pre-created by a
+  human or platform bootstrap process.
+- The Mgmt Controller validates that `spec.targetNamespace` exists and records
+  `NamespaceMissing` in `ClusterTarget.status` when it does not.
+- The default Biz Cluster kubeconfig does not need `namespaces create/update`
+  permission.
+- Automatic namespace creation is a future/optional bootstrap capability. If
+  enabled, it must be explicit on `ClusterTarget.spec.capabilities` and require
+  separate RBAC review.
 
 ## Target registration and kubeconfig storage
 
@@ -337,7 +349,27 @@ Additional host paths require an architecture update and a security review.
 
 ## Ownership model
 
-Every remote object should include:
+Remote objects are split by lifecycle.
+
+| Lifecycle | Examples | Required labels | GC rule |
+| --- | --- | --- | --- |
+| Target-scoped | OTel Collector DaemonSet, OTel Gateway Deployment, OSquery DaemonSet, shared ConfigMaps, ServiceAccounts, Roles, RoleBindings | `target`, `feature`, `scope=target` | Reconcile by `target + feature`; do not delete during per-ScanRun cleanup. |
+| Run-scoped | Security Assessment Jobs, report ConfigMaps, temporary scan volumes, per-run scanner resources | `target`, `scan-run`, `feature`, `scope=run` | Reconcile and delete by `target + scan-run + feature`. |
+
+Target-scoped remote object labels:
+
+```yaml
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kube-sentinel
+    security.kube-sentinel.io/target: <cluster-target-name>
+    security.kube-sentinel.io/feature: <feature-id>
+    security.kube-sentinel.io/scope: target
+  annotations:
+    security.kube-sentinel.io/spec-hash: <sha256>
+```
+
+Run-scoped remote object labels:
 
 ```yaml
 metadata:
@@ -346,23 +378,36 @@ metadata:
     security.kube-sentinel.io/target: <cluster-target-name>
     security.kube-sentinel.io/scan-run: <scan-run-name>
     security.kube-sentinel.io/feature: <feature-id>
+    security.kube-sentinel.io/scope: run
   annotations:
     security.kube-sentinel.io/spec-hash: <sha256>
 ```
 
 Remote objects cannot use ownerReferences to Mgmt Cluster CRs. Garbage
-collection must use label selectors:
+collection must use lifecycle-specific label selectors.
+
+Target-scoped GC:
+
+```text
+security.kube-sentinel.io/target=<target>
+security.kube-sentinel.io/feature=<feature>
+security.kube-sentinel.io/scope=target
+```
+
+Run-scoped GC:
 
 ```text
 security.kube-sentinel.io/target=<target>
 security.kube-sentinel.io/scan-run=<scan-run>
 security.kube-sentinel.io/feature=<feature>
+security.kube-sentinel.io/scope=run
 ```
 
-Server-side apply field managers should include target and feature:
+Server-side apply field managers should include target, feature, and lifecycle:
 
 ```text
-kube-sentinel/<target>/<feature-id>
+kube-sentinel/<target>/<feature-id>/target
+kube-sentinel/<target>/<feature-id>/run
 ```
 
 ## Data routing

@@ -100,10 +100,16 @@ Cluster stages should add explicit manual checks in the milestone request, for
 example:
 
 ```bash
-kubectl get clustertarget,securityassessment,scanrun -A
-kubectl get ds,deploy,cm -n kube-sentinel-system
-kubectl logs -n kube-sentinel-system deploy/kube-sentinel-controller-manager
+kubectl --context mgmt get clustertarget,securityassessment,scanrun -A
+kubectl --context mgmt logs -n kube-sentinel-system deploy/kube-sentinel-controller-manager
+
+kubectl --context biz-a get namespace kube-sentinel-system
+kubectl --context biz-a get ds,deploy,job,cronjob,cm -n kube-sentinel-system
 ```
 
+Use explicit kubeconfig contexts in every milestone request. Mgmt Cluster
+commands inspect kube-sentinel CRDs, controller logs, and status. Biz Cluster
+commands inspect only remotely applied resources and read-only scan targets.
+
 LGTM stages should include concrete checks against Loki streams, Mimir counters,
-Tempo traces where applicable, and Grafana dashboard screenshots.
+Tempo scan/pipeline traces where applicable, and Grafana dashboard screenshots.

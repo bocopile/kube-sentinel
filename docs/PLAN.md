@@ -17,7 +17,7 @@
 | G2 | Feature 토글(`enabled: false`)로 개별 DaemonSet 생성/삭제 | CRD 수정 → DS 사라짐/생성 확인 |
 | G3 | Override 적용으로 특정 도구의 리소스/tolerations 변경 | CRD override 수정 → DS spec 변경 확인 |
 | G4 | 주요 점검/인벤토리 데이터가 LGTM에 CTEM 용도별 telemetry로 적재 | Loki LogQL, Mimir PromQL, Grafana dashboard 조회 |
-| G5 | Grafana 대시보드 3개 동작 | 이벤트, 인벤토리, 취약점/점검 결과 dashboard 스크린샷 |
+| G5 | Grafana 대시보드 3개 동작 | finding, inventory, vulnerability, scan health dashboard 스크린샷 |
 | G6 | Final Check Dashboard에서 최종점검 결과를 메뉴별로 조회 | Grafana dashboard 또는 frontend 화면 스크린샷 |
 | G7 | CTEM 매핑 검증 체크리스트 통과 | 검증 항목 Pass/Fail |
 | G8 | 소스코드 정적분석 기반 보안 취약 패턴과 위험 코드를 식별 | Semgrep/gosec 결과 리포트 확인 |
@@ -86,7 +86,7 @@ flowchart TD
 
     otel_node -- "OTLP/gRPC" --> otel_gateway["OTel Gateway<br/>transform/severity<br/>routing processor"]
 
-    otel_gateway --> loki["Loki<br/>security events/findings logs<br/>LogQL"]
+    otel_gateway --> loki["Loki<br/>security findings/inventory logs<br/>LogQL"]
     otel_gateway --> mimir["Mimir<br/>collector/sensor/finding metrics<br/>PromQL"]
     otel_gateway --> tempo["Tempo<br/>pipeline traces<br/>trace correlation"]
 
@@ -114,7 +114,7 @@ flowchart TD
 - Biz Cluster 목록은 Mgmt Cluster의 `ClusterTarget`과 `status`를 기준으로 조회한다. kubeconfig Secret 값은 대시보드/API/로그에 노출하지 않는다.
 - `security_assessment`는 현재 버전에서 납품 산출물 보안 점검을 수행하는 별도 Job/CronJob 계층으로 둔다.
 - 개별 scanner 결과는 도구별 포맷 그대로 저장하지 않고 `Security Finding Schema`로 정규화한 뒤 LGTM에 적재한다.
-- Loki는 finding/event 원문과 상세 메시지, Mimir는 집계 지표와 실패/통과 카운트, Tempo는 scan/pipeline 실행 추적에 사용한다.
+- Loki는 finding/inventory 원문과 상세 메시지, Mimir는 집계 지표와 실패/통과 카운트, Tempo는 scan/pipeline 실행 추적에 사용한다.
 - 최종 판정은 scanner exit code 하나에 의존하지 않고 필수 산출물 존재 여부, 분석 실패 여부, 예외 승인 상태를 함께 평가한다.
 - Runtime 환경 점검은 다음 버전 범위로 분리한다.
 
@@ -497,7 +497,25 @@ Reconcile()
 
 ### SSA / GC 리소스 소유 전략
 
-모든 생성 리소스에는 다음 label/annotation을 붙인다.
+생성 리소스는 lifecycle에 따라 target-scoped와 run-scoped로 나눈다. OTel
+Collector, Gateway, OSquery DaemonSet, shared RBAC처럼 오래 살아야 하는
+리소스는 target-scoped이고, Security Assessment Job/report처럼 검사 실행에
+종속되는 리소스는 run-scoped이다.
+
+Target-scoped 리소스 label/annotation:
+
+```yaml
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kube-sentinel
+    security.kube-sentinel.io/target: dev-a
+    security.kube-sentinel.io/feature: otel_pipeline
+    security.kube-sentinel.io/scope: target
+  annotations:
+    security.kube-sentinel.io/spec-hash: "<sha256>"
+```
+
+Run-scoped 리소스 label/annotation:
 
 ```yaml
 metadata:
@@ -506,14 +524,16 @@ metadata:
     security.kube-sentinel.io/target: dev-a
     security.kube-sentinel.io/scan-run: final-check-2026-06-001
     security.kube-sentinel.io/feature: security_assessment
+    security.kube-sentinel.io/scope: run
   annotations:
     security.kube-sentinel.io/spec-hash: "<sha256>"
 ```
 
-- SSA field manager는 `kube-sentinel/<target>/<feature>` 형식으로 분리한다.
+- SSA field manager는 `kube-sentinel/<target>/<feature>/<scope>` 형식으로 분리한다.
 - apply conflict는 기본적으로 status `ApplyError`로 보고하고 강제 적용하지 않는다.
 - Remote object에는 Mgmt Cluster CR을 향한 ownerReference를 걸 수 없다. GC는 label selector와 spec hash 기준으로만 수행한다.
-- 비활성 feature GC는 `security.kube-sentinel.io/target=<target>`, `security.kube-sentinel.io/scan-run=<scan-run>`, `security.kube-sentinel.io/feature=<id>` 리소스 중 desired set에 없는 항목만 삭제한다.
+- 비활성 target-scoped feature GC는 `target=<target>`, `feature=<id>`, `scope=target` 리소스 중 desired set에 없는 항목만 삭제한다.
+- ScanRun cleanup은 `target=<target>`, `scan-run=<scan-run>`, `feature=<id>`, `scope=run` 리소스만 대상으로 한다. 이전 ScanRun cleanup이 OTel/OSquery 같은 target-scoped 리소스를 삭제하면 안 된다.
 
 ---
 
@@ -597,7 +617,7 @@ kube-sentinel/
 | **M0** | 인프라 준비 (네임스페이스, PSA, BTF 확인, 로그 디렉터리, LGTM 연결) | 1일 | privileged Pod 배포 가능, `/sys/kernel/btf/vmlinux` 존재, Loki/Mimir/Tempo test telemetry 적재 |
 | **M0.5** | 납품 산출물 보안 점검 베이스라인 | 1일 | SAST/Secret/Image/SBOM/무결성/Manifest/RBAC/Dockerfile/Script report 생성 |
 | **M1** | Grafana LGTM 기반 관측 백엔드 | 2~3일 | Loki/Tempo/Mimir/Grafana datasource와 기본 dashboard 동작 |
-| **M2** | Operator Core (CRD + Registry + Store + Override + SSA + Finalizer) + OTel Pipeline + Security Finding Schema | 3~4일 | CRD 적용 시 OTel Gateway/Node DS 자동 생성, finding/event telemetry 적재 확인 |
+| **M2** | Operator Core (CRD + Registry + Store + Override + SSA + Finalizer) + OTel Pipeline + Security Finding Schema | 3~4일 | CRD 적용 시 OTel Gateway/Node DS 자동 생성, finding/inventory telemetry 적재 확인 |
 | **M3** | Security Assessment Feature 상세 구현 | 2~3일 | 산출물 scanner 실행, normalized finding, scan health 생성 |
 | **M4** | Applied Cluster Configuration Scan | 2일 | Biz Cluster read-only 조회로 Workload/RBAC/Secret 참조 finding 생성 |
 | **M5** | OSquery Feature (CTEM Scope 쿼리 팩) | 2일 | Grafana inventory dashboard에 system_info 유입 |
