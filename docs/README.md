@@ -9,9 +9,10 @@ verification gates explicit.
 1. [PLAN.md](./PLAN.md) - original PoC plan and source of truth.
 2. [REQUIREMENTS.md](./REQUIREMENTS.md) - user-visible goals and acceptance criteria.
 3. [ARCHITECTURE.md](./ARCHITECTURE.md) - operator, feature registry, and data pipeline design.
-4. [ROADMAP.md](./ROADMAP.md) - implementation stages and exit criteria.
-5. [ORCHESTRATOR.md](./ORCHESTRATOR.md) - how to use `~/IdeaProjects/orchestrator` for this repo.
-6. [PROMPTS.md](./PROMPTS.md) - milestone prompts for orchestrator `plan` and `run`.
+4. [SECURITY_ASSESSMENT.md](./SECURITY_ASSESSMENT.md) - final-check security assessment scope, scan profiles, and decision policy.
+5. [FRONTEND_ARCHITECTURE.md](./FRONTEND_ARCHITECTURE.md) - Final Check Dashboard screen structure and frontend data model.
+6. [ROADMAP.md](./ROADMAP.md) - implementation stages and exit criteria.
+7. [PROMPTS.md](./PROMPTS.md) - milestone prompts for orchestrator `plan` and `run`.
 
 ## Documentation policy
 
@@ -21,6 +22,6 @@ verification gates explicit.
 - Prefer English for new focused contract documents. `PLAN.md` may remain in its
   original mixed Korean/English form until a dedicated translation pass is made.
 - Every implementation milestone must have an exit criterion that can be tested
-  by command, Kubernetes object inspection, Elasticsearch query, or screenshot.
+  by command, Kubernetes object inspection, LGTM query, report artifact, or screenshot.
 - Any deviation from the architecture should be recorded in the relevant focused
   document before code changes are made.

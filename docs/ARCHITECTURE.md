@@ -10,7 +10,8 @@ kind: SecurityAgent
 ```
 
 The operator reconciles this CR into sensor workloads, OpenTelemetry pipeline
-resources, Elasticsearch ingestion helpers, and status conditions.
+resources, security assessment jobs, Grafana LGTM routing, and status
+conditions.
 
 ## API scope decision
 
@@ -44,35 +45,43 @@ to `kube-sentinel-system`. Samples should not set `metadata.namespace` on the
 | Desired state store | Collects Kubernetes objects contributed by features before apply. |
 | Override layer | Applies global node-agent overrides and feature-specific overrides. |
 | OTel config builder | Merges receiver/exporter fragments into Node Collector and Gateway configs. |
+| Security assessment feature | Runs delivery artifact and applied cluster configuration scans, normalizes findings, and records scan health. |
+| Dashboard model | Provides one Final Check Dashboard with Overview, Source & Secrets, Images & Integrity, Kubernetes Config & RBAC, Dockerfile & Scripts, Scan Health, and Exceptions & Remediation menus. |
 | Feature packages | Own tool-specific defaults, config validation, resources, OTel fragments, and readiness checks. |
 
 ## Managed infrastructure boundary
 
-The kube-sentinel operator does not create Elasticsearch, Kibana, or ECK
-resources.
+The kube-sentinel operator does not create Loki, Mimir, Tempo, Grafana, or
+their storage backends.
 
 The `otel_pipeline` feature manages only kube-sentinel collection components:
 
 - OTel Node Collector DaemonSet and ConfigMap.
 - OTel Gateway Deployment, Service, ConfigMap, and related RBAC.
 - Pipeline wiring from enabled feature receiver fragments to the configured
-  Elasticsearch endpoint.
+  LGTM endpoints.
 
-Elasticsearch and Kibana are prerequisites. PoC installation assets may live
-under `config/elasticsearch/`, but they are applied manually or by a separate
-platform workflow during M1. The operator reads `spec.output.elasticsearch` and
-reports connection/runtime failures through status; it must not reconcile ECK
-`Elasticsearch` or `Kibana` custom resources.
+Loki, Mimir, Tempo, and Grafana are prerequisites. PoC installation assets may
+live under `config/lgtm/`, but they are applied manually or by a separate
+platform workflow during M1. The operator reads `spec.output.lgtm` and reports
+connection/runtime failures through status; it must not reconcile LGTM backend
+custom resources.
+
+The `security_assessment` feature manages only assessment jobs, config, and
+report volumes for the selected final-check scope. It may inspect delivery
+artifacts and applied cluster configuration metadata, but it must not collect
+raw Secret values.
 
 ## Feature priorities
 
 | Priority | Feature | Reason |
 | --- | --- | --- |
 | 10 | `otel_pipeline` | Collection infrastructure must exist before sensors emit data. |
+| 50 | `security_assessment` | Delivery artifact and applied cluster configuration findings should be normalized before dashboards evaluate delivery readiness. |
 | 100 | `falco` | Runtime event sensor. |
 | 100 | `tetragon` | Runtime event sensor. |
 | 100 | `osquery` | Inventory sensor. |
-| 200 | `trivy` | Vulnerability ingestion depends on Trivy reports and direct Elasticsearch upsert. |
+| 200 | `trivy` | Vulnerability ingestion depends on Trivy reports and normalized finding output. |
 
 ## Reconcile flow
 
@@ -156,23 +165,37 @@ kube-sentinel/<feature-id>
 
 ## Data routing
 
-| Source | Collection path | Destination index | CTEM phase |
+| Source | Collection path | LGTM destination | CTEM phase |
 | --- | --- | --- | --- |
-| Falco | File log through OTel Node Collector | `security-events` | Validation |
-| Tetragon | Pod log through OTel Node Collector | `security-events` | Validation |
-| OSquery | File log through OTel Node Collector | `security-inventory` | Scope |
-| Trivy | VulnerabilityReport read by ingestor job | `security-vuln` | Discovery / Priority |
+| Falco | File log through OTel Node Collector | Loki `{category="runtime_event"}` + Mimir event counters | Validation |
+| Tetragon | Pod log through OTel Node Collector | Loki `{category="runtime_event"}` + Mimir event counters | Validation |
+| OSquery | File log through OTel Node Collector | Loki `{category="inventory"}` + Mimir inventory counters | Scope |
+| Trivy | VulnerabilityReport read by ingestor job | Loki `{category="vulnerability"}` + Mimir vulnerability counters | Discovery / Priority |
+| Security Assessment | Scanner reports and applied cluster configuration snapshot | Loki `{category="security_finding"}` + Mimir finding counters + report artifact | Discovery / Priority |
+
+Dashboard menus should be derived from normalized finding categories rather than
+scanner tool names:
+
+| Menu | Finding categories |
+| --- | --- |
+| Overview | `scan_health`, Critical/High finding counters, exception-required counters |
+| Source & Secrets | `sast`, `secret` |
+| Images & Integrity | `image_vulnerability`, `integrity`, `sbom` |
+| Kubernetes Config & RBAC | `kubernetes`, `rbac`, `secret_ref`, `network` |
+| Dockerfile & Scripts | `dockerfile`, `script` |
+| Scan Health | `scan_health` |
+| Exceptions & Remediation | findings where `exception_required=true`, approved exceptions, expired exceptions |
 
 ## OTel resiliency policy
 
-The OTel config builder must generate bounded failure behavior. Elasticsearch
+The OTel config builder must generate bounded failure behavior. LGTM endpoint
 outages must not cause unbounded memory growth.
 
 Required defaults:
 
 - `memory_limiter` processor enabled in Node Collector and Gateway.
 - `batch` processor enabled with bounded batch sizes.
-- Elasticsearch exporter timeout set explicitly.
+- LGTM exporter timeout set explicitly.
 - Exporter sending queue enabled with a bounded queue size.
 - Retry enabled with finite backoff and finite max elapsed time.
 - Data is dropped after retry exhaustion and reflected in collector metrics.
@@ -237,8 +260,10 @@ Third-party resources:
 - Tetragon `TracingPolicy` resources: get, list, watch, create, update, patch, delete
 - Trivy `VulnerabilityReport` resources: get, list, watch
 
-Secrets are read-only. The operator must not create or mutate Elasticsearch
-credentials.
+Secrets are read-only. The operator must not create or mutate LGTM credentials.
+Applied cluster configuration assessment may report Secret references,
+projected volumes, `env`/`envFrom`, and ServiceAccount token automount
+settings, but it must not read or persist Secret data.
 
 ## Status model
 

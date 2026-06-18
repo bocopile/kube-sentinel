@@ -7,26 +7,27 @@ in a buildable and testable state.
 
 | Stage | Scope | Exit criteria |
 | --- | --- | --- |
-| S0 | Cluster prerequisites | Privileged DaemonSet runs, BTF file exists, Elasticsearch test document can be written. |
-| S1 | OTel and parser spike | Falco/Tetragon/OSquery sample logs route to event/inventory indices, Trivy fixture upserts into vulnerability index. |
-| S2 | Operator core and Falco vertical slice | One `SecurityAgent` CR creates OTel pipeline and Falco, and Falco events reach Elasticsearch. |
+| S0 | Cluster prerequisites | Privileged DaemonSet runs, BTF file exists, and Loki/Mimir/Tempo test telemetry can be written. |
+| S0.5 | Delivery artifact security assessment baseline | SAST, Secret, Image, SBOM, Integrity, Manifest/RBAC, Dockerfile, Script, and scan health reports are generated and normalized. |
+| S1 | OTel and parser spike | Falco/Tetragon/OSquery sample logs route to LGTM streams and metrics, and Trivy fixture becomes normalized finding telemetry. |
+| S2 | Operator core and Falco vertical slice | One `SecurityAgent` CR creates OTel pipeline and Falco, and Falco events reach Loki/Grafana. |
 | S3 | Remaining sensors | Tetragon, OSquery, and Trivy can each be enabled, disabled, assessed, and verified. |
-| S4 | Validation and dashboard | MITRE scenarios, Kibana dashboards, overrides, and garbage collection pass. |
+| S4 | Final-check validation and dashboard | Delivery artifact scan, applied cluster configuration scan, Grafana dashboard, overrides, and garbage collection pass. |
 
 ## Milestones
 
 | Milestone | Description | Expected duration | Exit criteria |
 | --- | --- | ---: | --- |
-| M0 | Infrastructure readiness checks | 1 day | Namespace, privileged workload, BTF, and Elasticsearch write test pass. |
-| M0.5 | Log and ingestion spike | 1 day | Sample logs and Trivy fixture are parsed and routed correctly. |
-| M1 | Elasticsearch and Kibana | 1-2 days | ECK deploys ES/Kibana and three index templates. |
-| M2 | Operator core | 3-4 days | CRD, registry, desired state store, override, SSA, finalizer, and OTel feature work. |
-| M3 | Falco feature | 2-3 days | Shell execution test appears in `security-events`. |
+| M0 | Infrastructure readiness checks | 1 day | Namespace, privileged workload, BTF, and LGTM write tests pass. |
+| M0.5 | Delivery artifact security assessment baseline | 1 day | Required artifacts, scanner versions, vulnerability DB baselines, image access, digest lists, and scan health reports are verified. |
+| M1 | Grafana LGTM backend | 1-2 days | Loki, Mimir, Tempo, Grafana datasources, and base dashboards work. |
+| M2 | Operator core + security assessment scaffold | 3-4 days | CRD, registry, desired state store, override, SSA, finalizer, OTel feature, and security assessment feature scaffold work. |
+| M3 | Falco feature | 2-3 days | Shell execution test appears in Loki/Grafana as a runtime event. |
 | M4 | Tetragon feature | 2 days | Tetragon policy emits expected process/security events. |
-| M5 | OSquery feature | 2 days | Inventory documents appear in `security-inventory`. |
-| M6 | Trivy feature | 2 days | CVE documents upsert into `security-vuln` without duplicates. |
-| M7 | MITRE and dashboards | 2-3 days | At least four scenarios detected and dashboards captured. |
-| M8 | Toggle and override validation | 1 day | Feature toggles and overrides are verified end to end. |
+| M5 | OSquery feature | 2 days | Inventory documents appear in Loki/Grafana and inventory counters update in Mimir. |
+| M6 | Trivy feature + image integrity | 2 days | Delivery image CVE/SBOM/digest findings are normalized without duplicate finding IDs. |
+| M7 | Final-check dashboard | 2-3 days | Overview, Source & Secrets, Images & Integrity, Kubernetes Config & RBAC, Dockerfile & Scripts, Scan Health, and Exceptions menus are captured. |
+| M8 | Toggle, override, and final-check validation | 1 day | Feature toggles, overrides, delivery artifact scan, applied cluster configuration scan, and exception status are verified end to end. |
 
 ## First implementation block
 
