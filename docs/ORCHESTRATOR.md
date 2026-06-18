@@ -76,9 +76,10 @@ Use narrow milestone requests instead of broad requests.
 Good:
 
 ```text
-Implement M2 operator core from docs/ROADMAP.md: CRD type, registry, desired
-state store, target kubeconfig loader, remote apply skeleton, override hook,
-SSA apply skeleton, and tests. Do not implement runtime sensors yet.
+Implement M2 management controller core from docs/ROADMAP.md: CRD type,
+assessment registry, desired state store, target kubeconfig loader, remote
+apply skeleton, SSA apply skeleton, report writer skeleton, and tests. Do not
+implement runtime sensors yet.
 ```
 
 Avoid:
@@ -111,5 +112,6 @@ Use explicit kubeconfig contexts in every milestone request. Mgmt Cluster
 commands inspect kube-sentinel CRDs, controller logs, and status. Biz Cluster
 commands inspect only remotely applied resources and read-only scan targets.
 
-LGTM stages should include concrete checks against Loki streams, Mimir counters,
-Tempo scan/pipeline traces where applicable, and Grafana dashboard screenshots.
+Report stages should include concrete checks against raw report artifacts,
+normalized finding records, scan health summaries, final decision records,
+evidence bundles, and dashboard screenshots.

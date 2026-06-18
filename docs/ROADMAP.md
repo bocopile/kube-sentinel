@@ -7,27 +7,28 @@ in a buildable and testable state.
 
 | Stage | Scope | Exit criteria |
 | --- | --- | --- |
-| S0 | Cluster prerequisites | Privileged DaemonSet runs, BTF file exists, and Loki/Mimir/Tempo test telemetry can be written. |
-| S0.5 | Delivery artifact security assessment baseline | SAST, Secret, Image, SBOM, Integrity, Manifest/RBAC, Dockerfile, Script, and scan health reports are generated and normalized. |
-| S1 | OTel and finding schema spike | Security Assessment and Trivy fixtures become normalized finding telemetry in LGTM. |
-| S2 | Mgmt controller and assessment vertical slice | `ClusterTarget`, `SecurityAssessment`, and `ScanRun` create Biz Cluster OTel pipeline and security assessment scaffold through remote apply. |
-| S3 | Remaining assessment capabilities | OSquery, Trivy delivery image scan, and applied cluster config scan can each be enabled, disabled, assessed, and verified. |
-| S4 | Final-check validation and dashboard | Delivery artifact scan, applied cluster configuration scan, Grafana dashboard, overrides, and garbage collection pass. |
+| S0 | Assessment prerequisites | Mgmt namespace, Biz Cluster kubeconfig Secret, target namespace, read-only RBAC, image access, and report store write test pass. |
+| S0.5 | Delivery artifact security assessment baseline | SAST, Secret, Image, SBOM, Integrity, Manifest/RBAC, Dockerfile, Script, artifact input manifest, scanner baseline, and scan health reports are generated and normalized. |
+| S1 | Report store and finding schema spike | Security Assessment and Trivy fixtures become normalized findings, stable finding IDs, metadata records, report artifacts, and evidence bundles. |
+| S2 | Mgmt controller and assessment vertical slice | `ClusterTarget`, `SecurityAssessment`, and `ScanRun` create assessment Jobs and report records through remote apply/read-only inspection. |
+| S3 | Remaining assessment capabilities | Trivy delivery image scan and applied cluster config scan can each be enabled, disabled, assessed, and verified. |
+| S4 | Final-check validation and dashboard | Delivery artifact scan, applied cluster configuration scan, dashboard, reports, and exception review pass. |
+| S5 | Phase 2 telemetry/inventory | OTel/LGTM/OSQuery/runtime telemetry is designed and added only if it becomes a product requirement. |
 
 ## Milestones
 
 | Milestone | Description | Expected duration | Exit criteria |
 | --- | --- | ---: | --- |
-| M0 | Infrastructure readiness checks | 1 day | Namespace, privileged workload, BTF, and LGTM write tests pass. |
-| M0.5 | Delivery artifact security assessment baseline | 1 day | Required artifacts, scanner versions, vulnerability DB baselines, image access, digest lists, and scan health reports are verified. |
-| M1 | Grafana LGTM backend | 1-2 days | Loki, Mimir, Tempo, Grafana datasources, and base dashboards work. |
-| M2 | Management controller core + security assessment scaffold | 3-4 days | ClusterTarget/SecurityAssessment/ScanRun CRDs, registry, desired state store, remote apply, SSA, finalizer, OTel feature, and security assessment feature scaffold work. |
+| M0 | Assessment readiness checks | 1 day | Mgmt namespace, Biz Cluster kubeconfig Secret, target namespace, read-only RBAC, image access, and report store write tests pass. |
+| M0.5 | Delivery artifact security assessment baseline | 1 day | Required artifacts, artifact input manifest, scanner versions, vulnerability DB baselines, image access, digest lists, and scan health reports are verified. |
+| M1 | Report store and dashboard backend | 1-2 days | Report artifacts, normalized findings with stable IDs, metadata indexes, scan health, final decision records, evidence bundles, and base dashboard retrieval views work. |
+| M2 | Management controller core + security assessment scaffold | 3-4 days | ClusterTarget/SecurityAssessment/ScanRun CRDs, desired state store, remote apply, SSA, finalizer, report writer, and security assessment scaffold work. |
 | M3 | Security Assessment feature | 2-3 days | Delivery artifact scanner reports become normalized findings with scan health. |
 | M4 | Applied cluster configuration scan | 2 days | Read-only cluster inspection reports Workload, RBAC, ServiceAccount, and Secret reference risks. |
-| M5 | OSquery feature | 2 days | Inventory documents appear in Loki/Grafana and inventory counters update in Mimir. |
-| M6 | Trivy feature + image integrity | 2 days | Delivery image CVE/SBOM/digest findings are normalized without duplicate finding IDs. |
-| M7 | Final-check dashboard | 2-3 days | Overview, Source & Secrets, Images & Integrity, Kubernetes Config & RBAC, Dockerfile & Scripts, Scan Health, and Exceptions menus are captured. |
-| M8 | Toggle, override, and final-check validation | 1 day | Feature toggles, overrides, delivery artifact scan, applied cluster configuration scan, and exception status are verified end to end. |
+| M5 | Trivy feature + image integrity | 2 days | Delivery image CVE/SBOM/digest findings and optional Trivy Operator `VulnerabilityReport` inputs are normalized without duplicate finding IDs. |
+| M6 | Optional telemetry/inventory extension | Optional | Phase 2 only: OTel/LGTM/OSQuery/runtime telemetry is introduced after a separate design review. |
+| M7 | Final-check dashboard | 2-3 days | Overview, Targets, Assessments, Findings, Reports, and Governance menus are captured. |
+| M8 | Final-check validation | 1 day | Delivery artifact scan, applied cluster configuration scan, report generation, Secret redaction, exception status, evidence bundle, and no-auto-remediation guardrails are verified end to end. |
 
 ## First implementation block
 

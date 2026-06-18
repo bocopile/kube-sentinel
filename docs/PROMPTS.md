@@ -23,24 +23,21 @@ Implementation:
 orchestrator run --project . --request "<prompt>" --auto-approve
 ```
 
-For larger stages, omit `--auto-approve` if you want to manually approve the
-task graph.
-
 ## Milestone mapping
 
 | Prompt | Roadmap stage | Roadmap milestone | Purpose |
 | --- | --- | --- | --- |
 | P0 | Foundation | First implementation block | Go management controller skeleton and core API contracts. |
-| P1 | S0 | M0 | Cluster prerequisite checks and LGTM connectivity. |
+| P1 | S0 | M0 | Assessment readiness checks. |
 | P2 | S0.5 | M0.5 | Delivery artifact security assessment baseline. |
-| P3 | S1 | M1 | Grafana LGTM backend and base dashboard checks. |
-| P4 | S2 | M2 | Operator core, OTel feature, and security assessment scaffold. |
+| P3 | S1 | M1 | Report store, finding schema, evidence bundle, and dashboard backend. |
+| P4 | S2 | M2 | Management controller core and security assessment scaffold. |
 | P5 | S2 | M3 | Security Assessment feature. |
 | P6 | S3 | M4 | Applied cluster configuration scan. |
-| P7 | S3 | M5 | OSquery feature. |
-| P8 | S3 | M6 | Trivy delivery image scan and image integrity feature. |
+| P7 | S3 | M5 | Trivy delivery image scan, image integrity, and optional VulnerabilityReport ingestion. |
+| P8 | S5 | M6 | Phase 2 optional inventory/telemetry extension. |
 | P9 | S4 | M7 | Final Check Dashboard. |
-| P10 | S4 | M8 | Toggle, override, final-check validation, and garbage collection. |
+| P10 | S4 | M8 | Final-check validation, reports, exceptions, and garbage collection. |
 
 ## Global instruction block
 
@@ -49,11 +46,13 @@ Add this block to milestone prompts when the request is complex:
 ```text
 Use docs/PLAN.md as the source plan, and use docs/REQUIREMENTS.md,
 docs/ARCHITECTURE.md, docs/SECURITY_ASSESSMENT.md,
-docs/FRONTEND_ARCHITECTURE.md, docs/ROADMAP.md, and docs/ORCHESTRATOR.md as
-the implementation contract. Keep changes scoped to the requested milestone.
-Do not implement later sensors or dashboards unless they are explicitly part of
-the milestone. Preserve buildability after the change. Add focused tests for
-new logic. Verification must include go test ./... and go build ./....
+docs/ASSESSMENT_SUPPORT_FEATURES.md, docs/FRONTEND_ARCHITECTURE.md,
+docs/ROADMAP.md, and docs/ORCHESTRATOR.md as the implementation contract.
+Keep changes scoped to the requested milestone. Do not implement Phase 2
+inventory, telemetry, runtime sensors, or automatic remediation unless they are
+explicitly part of the milestone. Preserve buildability after the change. Add
+focused tests for new logic. Verification must include go test ./... and
+go build ./....
 ```
 
 ## P0 - Create project skeleton
@@ -69,10 +68,10 @@ Implement the first kube-sentinel code block from docs/ROADMAP.md only:
 - Add or complete ClusterTarget, SecurityAssessment, and ScanRun API types under
   api/v1alpha1.
 - Add an empty but buildable controller reconciler.
-- Add feature registry interfaces and deterministic priority ordering.
+- Add assessment registry interfaces and deterministic priority ordering.
 - Add tests for registry ordering and unknown feature validation.
-- Do not implement OSquery, Trivy, OTel manifests, LGTM
-  integration, security assessment jobs, or dashboards yet.
+- Do not implement optional inventory, OTel manifests, LGTM integration,
+  runtime sensors, security assessment jobs, Trivy, or dashboards yet.
 
 Acceptance criteria:
 
@@ -86,47 +85,56 @@ Acceptance criteria:
 - Registry ordering is deterministic by priority and feature ID.
 ```
 
-## P1 - M0 infrastructure readiness checks
+## P1 - M0 assessment readiness checks
 
 ```text
-Use docs/ROADMAP.md S0/M0 as the target.
+Use docs/ROADMAP.md S0/M0 and docs/ASSESSMENT_SUPPORT_FEATURES.md as the target.
 
-Implement cluster prerequisite assets for kube-sentinel:
+Implement assessment readiness assets for kube-sentinel:
 
 - Namespace manifest for kube-sentinel-system.
-- A privileged preflight DaemonSet or Job that verifies required host access.
-- A script that checks /sys/kernel/btf/vmlinux from a node-level pod.
-- A script or manifest for sending test telemetry to Loki, Mimir, and Tempo.
+- Target preflight check for kubeconfig presence, API reachability, namespace
+  existence, read-only RBAC, image pull access, and report store write access.
+- Guard that detects accidental Secret read permission in target credentials and
+  reports it as a preflight risk.
 - Documentation for how to run and interpret the checks.
 
-Do not implement sensor deployment yet.
+Do not implement runtime sensors, OTel/LGTM telemetry, privileged DaemonSets, or
+automatic remediation.
 
 Acceptance criteria:
 
-- go test ./... passes.
-- go build ./... passes.
+- go test ./... passes if Go packages exist.
+- go build ./... passes if Go packages exist.
 - Kubernetes YAML can be rendered or applied with documented commands.
-- The preflight check reports privileged workload status, BTF availability, and
-  LGTM write connectivity.
+- Preflight distinguishes target environment failures from scanner findings.
+- Secret raw values are not read.
 ```
 
 ## P2 - M0.5 delivery artifact security assessment baseline
 
 ```text
-Use docs/SECURITY_ASSESSMENT.md and docs/ROADMAP.md S0.5/M0.5 as the target.
+Use docs/SECURITY_ASSESSMENT.md, docs/ASSESSMENT_SUPPORT_FEATURES.md, and
+docs/ROADMAP.md S0.5/M0.5 as the target.
 
 Implement the first security assessment baseline:
 
 - Scanner configuration placeholders for Semgrep/gosec, Gitleaks, Trivy/Grype,
   Syft, Cosign/Notation, Crane, kube-linter, conftest, Hadolint, and ShellCheck.
+- artifact-input.example.yaml for source paths, image list, digest list,
+  Helm/YAML, RBAC, Dockerfile, and scripts.
+- Scanner version and vulnerability DB/rule baseline capture.
 - scripts/run-security-assessment.sh orchestration skeleton.
 - scripts/verify-image-digest.sh for approved digest comparison.
 - scripts/normalize-findings.sh placeholder for scanner result normalization.
-- Report directory conventions for raw reports, normalized findings, and scan
-  health.
+- Scan health output for missing artifacts, unsupported targets, scanner
+  errors, stale baselines, and registry pull failures.
 
-Do not implement runtime event correlation or Trivy Operator
-VulnerabilityReport ingestion.
+Do not implement runtime event correlation, OSQuery, OTel/LGTM, or automatic
+remediation.
+M0.5 creates scanner configuration, input validation, baseline capture, and
+scan-health skeletons only. Actual delivery image vulnerability scanning is
+implemented in M5.
 
 Acceptance criteria:
 
@@ -135,37 +143,41 @@ Acceptance criteria:
 - Running the assessment script without required inputs reports scan health
   failures rather than a false pass.
 - Required artifact inputs are documented.
+- Scanner baseline data is written with the report.
 - No Secret raw values are written to reports.
 ```
 
-## P3 - M1 Grafana LGTM backend
+## P3 - M1 report store, schema, evidence, and dashboard backend
 
 ```text
-Implement M1 from docs/ROADMAP.md: Grafana LGTM backend for the kube-sentinel
-PoC.
+Implement M1 from docs/ROADMAP.md.
 
 Scope:
 
-- Kubernetes manifests or Helm values for Loki, Mimir, Tempo, and Grafana.
-- Datasource provisioning for Loki, Mimir, and Tempo.
-- Basic dashboard assets for event, inventory, vulnerability, and security
-  finding signals.
-- Test telemetry scripts for Loki logs, Mimir metrics, and Tempo traces.
-- Documentation for install, readiness checks, and teardown.
+- Report Store interfaces for raw scanner reports, normalized findings, scan
+  health, final decision records, and evidence bundles.
+- Security Finding Schema and schema validator.
+- Stable finding ID and deduplication helpers.
+- Secret redaction guard for reports, logs, dashboard records, and artifacts.
+- Evidence bundle export structure.
+- Base dashboard/read-model records for Overview, Targets, Assessments,
+  Findings, Reports, and Governance.
 
-Do not implement the kube-sentinel operator, OTel pipeline, or sensors in this
+Do not implement OTel/LGTM telemetry or Grafana-specific dashboards in this
 milestone.
 
 Acceptance criteria:
 
 - go test ./... passes if Go packages exist.
 - go build ./... passes if Go packages exist.
-- Manifests or values are deterministic and documented.
-- Grafana datasources are provisioned.
-- Documentation includes kubectl checks and sample LogQL/PromQL queries.
+- Duplicate fixture findings produce the same stable finding ID.
+- Invalid normalized findings fail schema validation.
+- Evidence bundle references raw report, normalized findings, scan health,
+  final decision, and exception candidates.
+- Secret-like fixture values are redacted or rejected before persistence.
 ```
 
-## P4 - M2 management controller core, OTel feature, and assessment scaffold
+## P4 - M2 management controller core and assessment scaffold
 
 ```text
 Implement M2 from docs/ROADMAP.md.
@@ -174,18 +186,18 @@ Scope:
 
 - ClusterTarget, SecurityAssessment, and ScanRun reconciler core.
 - Finalizer handling.
-- Feature registry integration.
+- Assessment registry integration.
 - Desired state store.
 - Remote apply client skeleton using ClusterTarget kubeconfigRef.
-- Override hook structure.
 - Server-side apply skeleton with managed labels and annotations from
   docs/ARCHITECTURE.md.
-- Status patching with observedGeneration and feature conditions.
-- otel_pipeline feature that contributes buildable Kubernetes objects.
+- Status patching with observedGeneration and workflow conditions.
 - security_assessment feature scaffold that can create assessment Job/CronJob
   resources without implementing all scanner logic.
+- Report writer skeleton for ScanRun results.
 
-Do not implement OSquery or Trivy feature logic yet.
+Do not implement optional inventory, OTel/LGTM, runtime sensors, automatic
+remediation, or Trivy feature logic yet.
 
 Acceptance criteria:
 
@@ -210,19 +222,21 @@ Scope:
 - Scanner config mount points and report output conventions.
 - Finding normalization invocation.
 - Scan health reporting for scanner failures and missing artifacts.
-- Sample SecurityAssessment enabling otel_pipeline and security_assessment.
+- Artifact input manifest validation.
+- Scanner baseline capture.
 
-Do not implement OSquery, Trivy delivery image scan, or applied cluster
-configuration scan yet.
+Do not implement optional inventory, Trivy delivery image scan, or applied
+cluster configuration scan yet.
 
 Acceptance criteria:
 
 - go test ./... passes.
 - go build ./... passes.
 - Generated assessment resources contain kube-sentinel ownership labels.
-- Disabling the security_assessment feature removes or marks stale resources
-  for GC.
+- Disabling the security_assessment feature removes or marks stale run-scoped
+  resources for GC.
 - Scanner failures are represented as scan health findings.
+- Evidence bundle output includes raw report and normalized finding references.
 ```
 
 ## P6 - M4 Applied cluster configuration scan
@@ -239,9 +253,10 @@ Scope:
   risks.
 - Secret reference inspection without reading raw Secret values.
 - Service/Ingress exposure inspection as an optional warning category.
+- Namespace allowlist validator.
 - Normalized findings for applied configuration risks.
 
-Do not implement OSquery or Trivy.
+Do not implement optional inventory, runtime sensors, or automatic remediation.
 
 Acceptance criteria:
 
@@ -249,41 +264,15 @@ Acceptance criteria:
 - go build ./... passes.
 - Applied cluster inspection uses read-only permissions.
 - Secret raw values are not read or persisted.
-- Sample SecurityAssessment can enable otel_pipeline and security_assessment
-  with applied cluster scan settings.
-- Documentation includes validation commands and expected Loki/Grafana fields.
+- Sample SecurityAssessment can enable security_assessment with applied cluster
+  scan settings.
+- Documentation includes validation commands and expected report fields.
 ```
 
-## P7 - M5 OSquery feature
+## P7 - M5 Trivy delivery image scan and integrity
 
 ```text
-Implement M5 from docs/ROADMAP.md: the OSquery feature.
-
-Scope:
-
-- osquery feature config defaults and validation.
-- OSquery DaemonSet and config for CTEM Scope inventory.
-- Minimal query pack for system, kernel, port, and container inventory.
-- OTel receiver fragment for OSquery result logs.
-- Readiness assessment and status updates.
-
-Do not implement Trivy.
-
-Acceptance criteria:
-
-- go test ./... passes.
-- go build ./... passes.
-- OSquery inventory documents route to Loki inventory streams and Mimir
-  inventory counters.
-- Sample SecurityAssessment can enable otel_pipeline and osquery for selected
-  ClusterTargets.
-- Documentation includes query and LGTM verification commands.
-```
-
-## P8 - M6 Trivy delivery image scan and integrity
-
-```text
-Implement M6 from docs/ROADMAP.md: Trivy delivery image scan plus image
+Implement M5 from docs/ROADMAP.md: Trivy delivery image scan plus image
 integrity.
 
 Scope:
@@ -293,21 +282,47 @@ Scope:
 - SBOM generation using Syft or Trivy SBOM output.
 - Digest verification using Crane and approved digest lists.
 - Optional signature verification hook for Cosign or Notation.
+- Optional read-only Trivy Operator VulnerabilityReport ingestion when the CRD
+  exists and the ClusterTarget has get/list/watch permission.
 - Deterministic finding ID:
   <imageRepository>/<imageDigest>/<vulnerabilityID>/<packageName>
-- Tests for duplicate-safe finding generation.
+- Tests for duplicate-safe finding generation across direct Trivy scan and
+  optional VulnerabilityReport input.
 
-Do not implement Trivy Operator VulnerabilityReport ingestion in this milestone.
-That is a Next Version extension.
+Do not install or operate Trivy Operator as part of this milestone. Do not fail
+the whole assessment when VulnerabilityReport is unavailable; record optional
+input unavailable in scan health.
 
 Acceptance criteria:
 
 - go test ./... passes.
 - go build ./... passes.
 - Duplicate Trivy fixture ingestion produces the same finding ID.
-- Vulnerability findings route to Loki vulnerability/security_finding streams
-  and Mimir counters.
-- Documentation includes install and verification commands.
+- Optional VulnerabilityReport fixture ingestion normalizes to the same finding
+  schema.
+- Vulnerability findings are written to Report Store records and evidence
+  bundles.
+- Documentation includes install-independent verification commands.
+```
+
+## P8 - M6 Phase 2 optional inventory/telemetry extension
+
+```text
+Implement M6 from docs/ROADMAP.md only if Phase 2 inventory or telemetry is
+approved after a separate design review.
+
+Scope candidates:
+
+- OSQuery or equivalent inventory sensor.
+- OTel/LGTM export path from normalized findings and report events.
+- Runtime event or drift assessment.
+- Long-running sensor DaemonSet model.
+
+Do not implement this during the first final-check PoC unless the product scope
+explicitly requires it.
+
+Acceptance criteria must be defined in a separate design document before work
+starts.
 ```
 
 ## P9 - M7 Final Check Dashboard
@@ -317,14 +332,14 @@ Implement M7 from docs/ROADMAP.md and docs/FRONTEND_ARCHITECTURE.md.
 
 Scope:
 
-- Final Check Dashboard assets for Overview, Source & Secrets, Images &
-  Integrity, Kubernetes Config & RBAC, Dockerfile & Scripts, Scan Health, and
-  Exceptions & Remediation.
+- Final Check Dashboard assets for Overview, Targets, Assessments, Findings,
+  Reports, and Governance.
 - Findings table or documented panel query conventions.
+- Report menu for final-check reports, evidence bundles, raw reports,
+  normalized findings, and scan health summaries.
 - Dashboard variables for environment, target version/build, scan run ID,
   namespace, image, severity, category, scanner, scan status, and exception
   status.
-- docs/ctem-mapping-results.md template.
 
 Acceptance criteria:
 
@@ -332,21 +347,24 @@ Acceptance criteria:
 - go build ./... passes if Go packages exist.
 - Dashboard assets or setup instructions are deterministic.
 - Screenshots or documented queries cover each menu.
-- CTEM results template maps Scope, Discovery, Priority, and Validation.
+- Reports menu exposes evidence bundle and final decision data.
 ```
 
-## P10 - M8 toggle, override, and final-check validation
+## P10 - M8 final-check validation
 
 ```text
 Implement M8 from docs/ROADMAP.md.
 
 Scope:
 
-- End-to-end validation assets for feature enable/disable.
-- Override validation for nodeAgent and feature-specific resource overrides.
-- Garbage collection verification for disabled features.
+- End-to-end validation assets for Code / Artifact Scan, Biz Cluster Scan, and
+  Full Final Check.
+- Garbage collection verification for disabled profiles and stale ScanRuns.
 - Delivery artifact assessment validation.
 - Applied cluster configuration assessment validation.
+- Secret redaction validation.
+- Evidence bundle and exception review validation.
+- No-auto-remediation guardrail validation.
 - Documentation of expected kubectl diff/get output and final-check report
   output.
 
@@ -354,12 +372,10 @@ Acceptance criteria:
 
 - go test ./... passes.
 - go build ./... passes.
-- Feature toggle tests or scripts cover security_assessment and one additional
-  feature.
-- Override tests or scripts verify resources and tolerations are reflected in
-  generated workload specs.
+- Validation scripts cover security_assessment and trivy.
 - Stale resource cleanup behavior is documented.
-- Final-check report output includes scan health and exception status.
+- Final-check report output includes scan health, evidence bundle references,
+  exception status, and no automatic Biz Cluster infrastructure mutation.
 ```
 
 ## Prompt quality checklist

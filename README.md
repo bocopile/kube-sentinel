@@ -16,14 +16,22 @@ final-check scans through remote apply:
   status.
 - `SecurityAssessment` for assessment templates and selected targets.
 - `ScanRun` for one execution and its per-target results.
-- OSquery inventory collection and Trivy-based delivery image vulnerability
-  assessment.
-- An OpenTelemetry pipeline that routes signals to Grafana LGTM.
+- Trivy-based delivery image vulnerability assessment. OSquery inventory is an
+  optional later extension, not a required final-check control.
 - Delivery artifact security assessment for source, secrets, container images,
   SBOM/integrity, Kubernetes YAML, RBAC, Dockerfile, and deployment scripts.
 - Applied Biz Cluster configuration assessment with read-only access.
+- Report Store and Evidence Bundle generation for scanner reports, normalized
+  findings, scan health, final decision, and exception review candidates.
 - A Final Check Dashboard for review, scan health, findings, and exception
   tracking.
+- Assessment reliability support features such as target preflight, artifact
+  input manifests, scanner baseline capture, stable finding IDs, Secret
+  redaction, evidence bundle export, exception review artifacts, and scan health
+  summaries.
+- Middleware and scanner version baselines for Kubernetes, Kubebuilder,
+  controller-runtime, Trivy, Semgrep, Gitleaks, SBOM/signing tools, and
+  Kubernetes policy scanners.
 
 Biz Clusters do not run a kube-sentinel operator and do not need kube-sentinel
 CRDs installed. Runtime event correlation and runtime drift validation are
@@ -52,10 +60,25 @@ Start with the docs in this order:
 2. [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)
 3. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 4. [docs/SECURITY_ASSESSMENT.md](docs/SECURITY_ASSESSMENT.md)
-5. [docs/FRONTEND_ARCHITECTURE.md](docs/FRONTEND_ARCHITECTURE.md)
-6. [docs/ROADMAP.md](docs/ROADMAP.md)
-7. [docs/ORCHESTRATOR.md](docs/ORCHESTRATOR.md)
-8. [docs/PROMPTS.md](docs/PROMPTS.md)
+5. [docs/ASSESSMENT_SUPPORT_FEATURES.md](docs/ASSESSMENT_SUPPORT_FEATURES.md)
+6. [docs/FRONTEND_ARCHITECTURE.md](docs/FRONTEND_ARCHITECTURE.md)
+7. [docs/ROADMAP.md](docs/ROADMAP.md)
+8. [docs/ORCHESTRATOR.md](docs/ORCHESTRATOR.md)
+9. [docs/PROMPTS.md](docs/PROMPTS.md)
+
+Documentation policy:
+
+- Keep [docs/PLAN.md](docs/PLAN.md) as the high-level planning document.
+- Put implementation contracts in focused documents so they can be reviewed and
+  used as orchestrator prompts.
+- Prefer English for implementation-facing contract documents. Korean is
+  acceptable for user-facing review documents and scope decisions that are
+  actively discussed in Korean.
+- Every implementation milestone must have an exit criterion that can be tested
+  by command, Kubernetes object inspection, report artifact, evidence bundle,
+  dashboard screenshot, or status field.
+- Record architecture deviations in the relevant focused document before code
+  changes are made.
 
 ## Next Implementation Step
 
