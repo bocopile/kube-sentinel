@@ -1,44 +1,45 @@
-# Roadmap
+# 로드맵
 
-The PoC should be implemented as vertical stages. Each stage must leave the repo
-in a buildable and testable state.
+PoC는 수직 slice 단계로 구현한다. 각 단계가 끝난 뒤 리포지터리는 build 및
+test 가능한 상태여야 한다.
 
-## Stage gates
+## Stage gate
 
-| Stage | Scope | Exit criteria |
+| Stage | 범위 | Exit criteria |
 | --- | --- | --- |
-| S0 | Assessment prerequisites | Mgmt namespace, Biz Cluster kubeconfig Secret, target namespace, read-only RBAC, image access, and report store write test pass. |
-| S0.5 | Delivery artifact security assessment baseline | SAST, Secret, Image, SBOM, Integrity, Manifest/RBAC, Dockerfile, Script, artifact input manifest, scanner baseline, and scan health reports are generated and normalized. |
-| S1 | Report store and finding schema spike | Security Assessment and Trivy fixtures become normalized findings, stable finding IDs, metadata records, report artifacts, and evidence bundles. |
-| S2 | Mgmt controller and assessment vertical slice | `ClusterTarget`, `SecurityAssessment`, and `ScanRun` create assessment Jobs and report records through remote apply/read-only inspection. |
-| S3 | Remaining assessment capabilities | Trivy delivery image scan and applied cluster config scan can each be enabled, disabled, assessed, and verified. |
-| S4 | Final-check validation and dashboard | Delivery artifact scan, applied cluster configuration scan, dashboard, reports, and exception review pass. |
-| S5 | Phase 2 telemetry/inventory | OTel/LGTM/OSQuery/runtime telemetry is designed and added only if it becomes a product requirement. |
+| S0 | Assessment prerequisite | Mgmt namespace, Biz Cluster kubeconfig Secret, target preflight, bootstrap policy, read-only RBAC, image access, report store write test 통과 |
+| S0.5 | Delivery artifact security assessment baseline | SAST, Secret, Image, SBOM, Integrity, Manifest/RBAC, Dockerfile, Script, artifact input manifest, scanner baseline, scan health report 생성 및 정규화 |
+| S1 | Report store와 finding schema spike | Security Assessment/Trivy fixture가 normalized finding, stable finding ID, metadata record, report artifact, evidence bundle로 변환 |
+| S2 | Mgmt 단일 operator와 assessment vertical slice | `ClusterTarget`, `SecurityAssessment`, `ScanRun`이 Feature orchestrator/registry, remote apply/read-only inspection으로 assessment Job과 report record 생성 |
+| S3 | 나머지 assessment capability | Trivy delivery image scan과 applied cluster config scan을 각각 enable/disable, assess, verify 가능 |
+| S4 | Final-check validation과 dashboard | Delivery artifact scan, applied cluster configuration scan, dashboard, report, exception review 통과 |
+| S5 | Phase 2 telemetry/inventory | OTel/LGTM/OSQuery/runtime telemetry는 제품 요구사항이 된 경우에만 설계 후 추가 |
 
-## Milestones
+## Milestone
 
-| Milestone | Description | Expected duration | Exit criteria |
+| Milestone | 설명 | 예상 기간 | Exit criteria |
 | --- | --- | ---: | --- |
-| M0 | Assessment readiness checks | 1 day | Mgmt namespace, Biz Cluster kubeconfig Secret, target namespace, read-only RBAC, image access, and report store write tests pass. |
-| M0.5 | Delivery artifact security assessment baseline | 1 day | Required artifacts, artifact input manifest, scanner versions, vulnerability DB baselines, image access, digest lists, and scan health reports are verified. |
-| M1 | Report store and dashboard backend | 1-2 days | Report artifacts, normalized findings with stable IDs, metadata indexes, scan health, final decision records, evidence bundles, and base dashboard retrieval views work. |
-| M2 | Management controller core + security assessment scaffold | 3-4 days | ClusterTarget/SecurityAssessment/ScanRun CRDs, desired state store, remote apply, SSA, finalizer, report writer, and security assessment scaffold work. |
-| M3 | Security Assessment feature | 2-3 days | Delivery artifact scanner reports become normalized findings with scan health. |
-| M4 | Applied cluster configuration scan | 2 days | Read-only cluster inspection reports Workload, RBAC, ServiceAccount, and Secret reference risks. |
-| M5 | Trivy feature + image integrity | 2 days | Delivery image CVE/SBOM/digest findings and optional Trivy Operator `VulnerabilityReport` inputs are normalized without duplicate finding IDs. |
-| M6 | Optional telemetry/inventory extension | Optional | Phase 2 only: OTel/LGTM/OSQuery/runtime telemetry is introduced after a separate design review. |
-| M7 | Final-check dashboard | 2-3 days | Overview, Targets, Assessments, Findings, Reports, and Governance menus are captured. |
-| M8 | Final-check validation | 1 day | Delivery artifact scan, applied cluster configuration scan, report generation, Secret redaction, exception status, evidence bundle, and no-auto-remediation guardrails are verified end to end. |
+| M0 | Assessment readiness check | 1일 | Mgmt namespace, Biz Cluster kubeconfig Secret, target preflight, bootstrap policy, read-only RBAC, image access, report store write test 통과 |
+| M0.5 | Delivery artifact security assessment baseline | 1일 | required artifact, artifact input manifest, scanner version, vulnerability DB baseline, image access, digest list, scan health report 검증 |
+| M1 | Report store와 dashboard backend | 1-2일 | report artifact, stable ID가 있는 normalized finding, metadata index, Artifact Store backend plugin, scan health, final decision record, evidence bundle, 기본 dashboard retrieval view 동작 |
+| M2 | Mgmt operator core + Feature orchestrator scaffold | 3-4일 | ClusterTarget/SecurityAssessment/ScanRun CRD, feature registry, feature orchestrator, desired state store, remote apply, bootstrap policy, SSA, finalizer, report writer, assessment scaffold 동작 |
+| M3 | Security Assessment feature | 2-3일 | delivery artifact scanner report가 scan health를 포함한 normalized finding으로 변환 |
+| M4 | Applied cluster configuration scan | 2일 | read-only cluster inspection이 Workload, RBAC, ServiceAccount, Secret reference 위험을 보고 |
+| M5 | Trivy feature + image integrity | 2일 | delivery image CVE/SBOM/digest finding과 optional Trivy Operator `VulnerabilityReport` 입력이 중복 finding ID 없이 정규화 |
+| M6 | Optional telemetry/inventory extension | 선택 | Phase 2 전용. OTel/LGTM/OSQuery/runtime telemetry는 별도 설계 검토 후 도입 |
+| M7 | Final-check dashboard | 2-3일 | Overview, Targets, Assessments, Findings, Reports, Governance 메뉴 캡처 |
+| M8 | Final-check validation | 1일 | delivery artifact scan, applied cluster configuration scan, report generation, Secret redaction, exception status, evidence bundle, no-auto-remediation guardrail end-to-end 검증 |
 
-## First implementation block
+## 첫 구현 블록
 
-The first code block should not attempt all sensors. It should create:
+첫 코드 블록은 모든 sensor를 한 번에 구현하지 않는다. 다음 항목을 생성한다.
 
-- Go module and controller-runtime project skeleton.
-- `ClusterTarget`, `SecurityAssessment`, and `ScanRun` API types.
-- Empty reconciler with status patching.
-- Feature registry interfaces.
-- Unit tests for registry ordering and unknown feature validation.
-- `.orchestrator/config.yaml` generated by `orchestrator init`.
+- Go module과 controller-runtime project skeleton
+- `ClusterTarget`, `SecurityAssessment`, `ScanRun` API type
+- status patching이 포함된 빈 reconciler
+- feature registry interface와 Feature orchestrator skeleton
+- Artifact Store backend plugin interface
+- registry ordering과 unknown feature validation unit test
+- `orchestrator init`으로 생성한 `.orchestrator/config.yaml`
 
-After that, proceed with S0 and S1.
+이후 S0과 S1을 진행한다.

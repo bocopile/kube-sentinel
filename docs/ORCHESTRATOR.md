@@ -1,27 +1,27 @@
-# Using orchestrator
+# orchestrator 사용 가이드
 
-`~/IdeaProjects/orchestrator` should be used as a workflow runner for
-kube-sentinel, not as a source template. Its built-in scaffold command currently
-targets Node/TypeScript projects, while kube-sentinel is a Go Kubernetes
-operator.
+`~/IdeaProjects/orchestrator`는 kube-sentinel의 source template가 아니라
+workflow runner로 사용한다. 내장 scaffold command는 현재 Node/TypeScript
+project를 대상으로 하며, kube-sentinel은 Go Kubernetes operator다.
 
-## Current bootstrap state
+## 현재 bootstrap 상태
 
-This repository is in a pre-skeleton Go state. It has `go.mod` and planning
-docs, but it does not yet have Kubebuilder-generated `cmd/`, `api/`,
-`internal/`, `config/`, `PROJECT`, or `.orchestrator/config.yaml` files.
+이 리포지터리는 pre-skeleton Go 상태다. `go.mod`와 계획 문서는 존재하지만
+Kubebuilder가 생성한 `cmd/`, `api/`, `internal/`, `config/`, `PROJECT`,
+`.orchestrator/config.yaml` 파일은 아직 없다.
 
-That means there are two valid execution modes:
+따라서 유효한 실행 방식은 두 가지다.
 
-- If local orchestrator `plan` and `run` are available, use
-  [PROMPTS.md](./PROMPTS.md) through orchestrator.
-- If orchestrator is still in a foundation/skeleton phase or fails to run
-  against this repo, use the P0-P3 prompts directly in Claude Code first. Return
-  to orchestrator after it can initialize and execute Go projects reliably.
+- local orchestrator `plan`과 `run`을 사용할 수 있으면
+  [PROMPTS.md](./PROMPTS.md)를 orchestrator로 실행한다.
+- orchestrator가 아직 foundation/skeleton 단계이거나 이 리포지터리에서
+  실행에 실패하면, 먼저 P0-P3 prompt를 Claude Code에서 직접 사용한다.
+  Go project를 안정적으로 초기화하고 실행할 수 있게 된 뒤 orchestrator로
+  돌아온다.
 
-## Local prerequisites
+## 로컬 선행 조건
 
-The current machine already has:
+현재 머신에 이미 있는 항목:
 
 - Node 24
 - `orchestrator`
@@ -32,16 +32,16 @@ The current machine already has:
 - `kubectl`
 - `helm`
 
-Still needed for the operator workflow:
+operator workflow에 추가로 필요한 항목:
 
 - `kubebuilder`
 - `controller-gen`
 - `kustomize`
 - `kind` or `minikube`
 
-## Recommended sequence
+## 권장 순서
 
-From the repository root:
+리포지터리 root에서 실행한다.
 
 ```bash
 kubebuilder init --domain kube-sentinel.io --repo github.com/bocopile/kube-sentinel
@@ -53,27 +53,26 @@ go build ./...
 orchestrator init --project . --yes
 ```
 
-Do not run the Kubebuilder commands twice against an already initialized repo
-without checking the generated files first. If `go.mod`, `PROJECT`, `api/`, or
-`config/` already exist, inspect them and continue from the matching prompt
-instead of reinitializing.
+이미 초기화된 repo에서 생성 파일을 확인하지 않고 Kubebuilder command를 두 번
+실행하지 않는다. `go.mod`, `PROJECT`, `api/`, `config/`가 이미 존재하면
+재초기화하지 말고 해당 상태에 맞는 prompt부터 이어서 진행한다.
 
-Then run orchestrator per milestone:
+그 다음 milestone별로 orchestrator를 실행한다.
 
 ```bash
 orchestrator plan --project . --request "Implement the first kube-sentinel code block from docs/ROADMAP.md"
 orchestrator run --project . --request "Implement the first kube-sentinel code block from docs/ROADMAP.md" --auto-approve
 ```
 
-Use `plan` before `run` for every stage. The plan command is useful because it
-stops before code changes and reports whether the request has enough acceptance
-criteria and project context.
+모든 stage에서 `run` 전에 `plan`을 사용한다. `plan` command는 코드 변경 전에
+멈추고, 요청에 충분한 acceptance criteria와 project context가 있는지
+확인할 수 있어 유용하다.
 
-## Suggested request style
+## 권장 요청 방식
 
-Use narrow milestone requests instead of broad requests.
+넓은 요청 대신 좁은 milestone 요청을 사용한다.
 
-Good:
+좋은 예:
 
 ```text
 Implement M2 management controller core from docs/ROADMAP.md: CRD type,
@@ -82,36 +81,36 @@ apply skeleton, SSA apply skeleton, report writer skeleton, and tests. Do not
 implement runtime sensors yet.
 ```
 
-Avoid:
+피해야 할 예:
 
 ```text
 Build kube-sentinel.
 ```
 
-## Verification commands
+## 검증 명령
 
-The orchestrator config for this repo should use Go commands:
+이 리포지터리의 orchestrator config는 Go command를 사용해야 한다.
 
 ```bash
 go test ./...
 go build ./...
 ```
 
-Cluster stages should add explicit manual checks in the milestone request, for
-example:
+Cluster stage는 milestone request에 명시적인 manual check를 추가해야 한다.
+예:
 
 ```bash
 kubectl --context mgmt get clustertarget,securityassessment,scanrun -A
 kubectl --context mgmt logs -n kube-sentinel-system deploy/kube-sentinel-controller-manager
 
 kubectl --context biz-a get namespace kube-sentinel-system
-kubectl --context biz-a get ds,deploy,job,cronjob,cm -n kube-sentinel-system
+kubectl --context biz-a get job,cronjob,cm,sa,role,rolebinding -n kube-sentinel-system
 ```
 
-Use explicit kubeconfig contexts in every milestone request. Mgmt Cluster
-commands inspect kube-sentinel CRDs, controller logs, and status. Biz Cluster
-commands inspect only remotely applied resources and read-only scan targets.
+모든 milestone request에서 kubeconfig context를 명시한다. Mgmt Cluster
+command는 kube-sentinel CRD, controller log, status를 확인한다. Biz Cluster
+command는 remote apply된 resource와 read-only scan target만 확인한다.
 
-Report stages should include concrete checks against raw report artifacts,
-normalized finding records, scan health summaries, final decision records,
-evidence bundles, and dashboard screenshots.
+Report stage는 raw report artifact, normalized finding record, scan health
+summary, final decision record, evidence bundle, dashboard screenshot에 대한
+구체적인 검증을 포함해야 한다.

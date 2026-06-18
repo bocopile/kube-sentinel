@@ -1,15 +1,15 @@
-# Orchestrator prompts
+# Orchestrator 프롬프트
 
-Use these prompts with `orchestrator plan` first, then `orchestrator run` only
-after the plan looks acceptable.
+아래 prompt는 먼저 `orchestrator plan`으로 검토한 뒤, plan이 적절할 때만
+`orchestrator run`으로 실행한다.
 
-All prompts assume the project root is the current checkout of:
+모든 prompt는 project root가 다음 checkout이라고 가정한다.
 
 ```text
 github.com/bocopile/kube-sentinel
 ```
 
-## Command pattern
+## 명령 패턴
 
 Dry run:
 
@@ -17,374 +17,373 @@ Dry run:
 orchestrator plan --project . --request "<prompt>"
 ```
 
-Implementation:
+구현 실행:
 
 ```bash
 orchestrator run --project . --request "<prompt>" --auto-approve
 ```
 
-## Milestone mapping
+## 마일스톤 매핑
 
-| Prompt | Roadmap stage | Roadmap milestone | Purpose |
+| Prompt | Roadmap stage | Roadmap milestone | 목적 |
 | --- | --- | --- | --- |
-| P0 | Foundation | First implementation block | Go management controller skeleton and core API contracts. |
-| P1 | S0 | M0 | Assessment readiness checks. |
-| P2 | S0.5 | M0.5 | Delivery artifact security assessment baseline. |
-| P3 | S1 | M1 | Report store, finding schema, evidence bundle, and dashboard backend. |
-| P4 | S2 | M2 | Management controller core and security assessment scaffold. |
-| P5 | S2 | M3 | Security Assessment feature. |
-| P6 | S3 | M4 | Applied cluster configuration scan. |
-| P7 | S3 | M5 | Trivy delivery image scan, image integrity, and optional VulnerabilityReport ingestion. |
-| P8 | S5 | M6 | Phase 2 optional inventory/telemetry extension. |
-| P9 | S4 | M7 | Final Check Dashboard. |
-| P10 | S4 | M8 | Final-check validation, reports, exceptions, and garbage collection. |
+| P0 | Foundation | First implementation block | Go management controller skeleton과 core API contract |
+| P1 | S0 | M0 | Assessment readiness check |
+| P2 | S0.5 | M0.5 | Delivery artifact security assessment baseline |
+| P3 | S1 | M1 | Report store, finding schema, evidence bundle, dashboard backend |
+| P4 | S2 | M2 | Mgmt operator core, Feature orchestrator, security assessment scaffold |
+| P5 | S2 | M3 | Security Assessment feature |
+| P6 | S3 | M4 | Applied cluster configuration scan |
+| P7 | S3 | M5 | Trivy delivery image scan, image integrity, optional VulnerabilityReport ingestion |
+| P8 | S5 | M6 | Phase 2 optional inventory/telemetry extension |
+| P9 | S4 | M7 | Final Check Dashboard |
+| P10 | S4 | M8 | Final-check validation, report, exception, garbage collection |
 
-## Global instruction block
+## 공통 지시 블록
 
-Add this block to milestone prompts when the request is complex:
+복잡한 milestone prompt에는 다음 블록을 추가한다.
 
 ```text
-Use docs/PLAN.md as the source plan, and use docs/REQUIREMENTS.md,
+docs/PLAN.md를 source plan으로 사용하고, docs/REQUIREMENTS.md,
 docs/ARCHITECTURE.md, docs/SECURITY_ASSESSMENT.md,
 docs/ASSESSMENT_SUPPORT_FEATURES.md, docs/FRONTEND_ARCHITECTURE.md,
-docs/ROADMAP.md, and docs/ORCHESTRATOR.md as the implementation contract.
-Keep changes scoped to the requested milestone. Do not implement Phase 2
-inventory, telemetry, runtime sensors, or automatic remediation unless they are
-explicitly part of the milestone. Preserve buildability after the change. Add
-focused tests for new logic. Verification must include go test ./... and
-go build ./....
+docs/ROADMAP.md, docs/ORCHESTRATOR.md를 구현 계약으로 사용한다.
+변경은 요청된 milestone 범위로 제한한다. Phase 2 inventory, telemetry,
+runtime sensor, automatic remediation은 해당 milestone에 명시되지 않은 한
+구현하지 않는다. 변경 후 build 가능한 상태를 유지한다. 새 logic에는
+집중된 test를 추가한다. 검증에는 go test ./...와 go build ./....를 포함한다.
 ```
 
-## P0 - Create project skeleton
+## P0 - Project skeleton 생성
 
 ```text
-Use docs/PLAN.md, docs/REQUIREMENTS.md, docs/ARCHITECTURE.md, and
-docs/ROADMAP.md as the project contract.
+docs/PLAN.md, docs/REQUIREMENTS.md, docs/ARCHITECTURE.md,
+docs/ROADMAP.md를 project contract로 사용한다.
 
-Implement the first kube-sentinel code block from docs/ROADMAP.md only:
+docs/ROADMAP.md의 첫 kube-sentinel code block만 구현한다.
 
-- Ensure this is a Go Kubernetes management controller project using module
-  github.com/bocopile/kube-sentinel.
-- Add or complete ClusterTarget, SecurityAssessment, and ScanRun API types under
-  api/v1alpha1.
-- Add an empty but buildable controller reconciler.
-- Add assessment registry interfaces and deterministic priority ordering.
-- Add tests for registry ordering and unknown feature validation.
-- Do not implement optional inventory, OTel manifests, LGTM integration,
-  runtime sensors, security assessment jobs, Trivy, or dashboards yet.
+- 이 project가 github.com/bocopile/kube-sentinel module을 사용하는 Go
+  Kubernetes management controller project인지 확인한다.
+- api/v1alpha1 아래 ClusterTarget, SecurityAssessment, ScanRun API type을
+  추가하거나 완성한다.
+- 비어 있지만 build 가능한 controller reconciler를 추가한다.
+- feature registry interface, Feature orchestrator skeleton, deterministic
+  priority ordering을 추가한다.
+- Artifact Store backend plugin interface를 추가한다.
+- registry ordering과 unknown feature validation test를 추가한다.
+- optional inventory, OTel manifest, LGTM integration, runtime sensor,
+  security assessment job, Trivy, dashboard는 아직 구현하지 않는다.
 
 Acceptance criteria:
 
-- go test ./... passes.
-- go build ./... passes.
-- ClusterTarget contains target kubeconfigRef, targetNamespace,
-  namespaceAllowlist, output, capabilities, and status fields.
-- SecurityAssessment contains selected targets and scan profiles.
-- ScanRun contains scan execution status and per-target results.
-- Unknown feature names can be detected and reported by pure Go unit tests.
-- Registry ordering is deterministic by priority and feature ID.
+- go test ./... 통과
+- go build ./... 통과
+- ClusterTarget이 target kubeconfigRef, targetNamespace, namespaceAllowlist,
+  output, capabilities, status field를 포함
+- SecurityAssessment가 selected target과 scan profile 포함
+- ScanRun이 scan execution status와 target별 result 포함
+- pure Go unit test로 unknown feature name을 탐지하고 보고 가능
+- Registry ordering이 priority와 feature ID 기준으로 deterministic
+- Artifact Store backend plugin interface가 backend 구현체와 분리됨
 ```
 
 ## P1 - M0 assessment readiness checks
 
 ```text
-Use docs/ROADMAP.md S0/M0 and docs/ASSESSMENT_SUPPORT_FEATURES.md as the target.
+docs/ROADMAP.md S0/M0과 docs/ASSESSMENT_SUPPORT_FEATURES.md를 구현 대상으로 사용한다.
 
-Implement assessment readiness assets for kube-sentinel:
+kube-sentinel assessment 준비 상태 검증 자산을 구현한다.
 
-- Namespace manifest for kube-sentinel-system.
-- Target preflight check for kubeconfig presence, API reachability, namespace
-  existence, read-only RBAC, image pull access, and report store write access.
-- Guard that detects accidental Secret read permission in target credentials and
-  reports it as a preflight risk.
-- Documentation for how to run and interpret the checks.
+- kube-sentinel-system namespace manifest.
+- kubeconfig 존재 여부, API 접근 가능 여부, namespace 존재 여부, read-only RBAC,
+  image pull 접근, report store write 접근을 확인하는 target preflight check.
+- target credential에 의도치 않은 Secret read 권한이 포함되었는지 탐지하고
+  preflight risk로 보고하는 guard.
+- check 실행 방법과 결과 해석 방법 문서.
 
-Do not implement runtime sensors, OTel/LGTM telemetry, privileged DaemonSets, or
-automatic remediation.
+runtime sensor, OTel/LGTM telemetry, privileged DaemonSet, automatic remediation은
+구현하지 않는다.
 
-Acceptance criteria:
+수용 기준:
 
-- go test ./... passes if Go packages exist.
-- go build ./... passes if Go packages exist.
-- Kubernetes YAML can be rendered or applied with documented commands.
-- Preflight distinguishes target environment failures from scanner findings.
-- Secret raw values are not read.
+- Go package가 존재하면 go test ./... 통과.
+- Go package가 존재하면 go build ./... 통과.
+- Kubernetes YAML을 문서화된 명령으로 render 또는 apply 가능.
+- Preflight가 target 환경 실패와 scanner finding을 구분.
+- Secret raw value를 읽지 않음.
 ```
 
 ## P2 - M0.5 delivery artifact security assessment baseline
 
 ```text
-Use docs/SECURITY_ASSESSMENT.md, docs/ASSESSMENT_SUPPORT_FEATURES.md, and
-docs/ROADMAP.md S0.5/M0.5 as the target.
+docs/SECURITY_ASSESSMENT.md, docs/ASSESSMENT_SUPPORT_FEATURES.md,
+docs/ROADMAP.md S0.5/M0.5를 구현 대상으로 사용한다.
 
-Implement the first security assessment baseline:
+1차 security assessment baseline을 구현한다.
 
-- Scanner configuration placeholders for Semgrep/gosec, Gitleaks, Trivy/Grype,
-  Syft, Cosign/Notation, Crane, kube-linter, conftest, Hadolint, and ShellCheck.
-- artifact-input.example.yaml for source paths, image list, digest list,
-  Helm/YAML, RBAC, Dockerfile, and scripts.
-- Scanner version and vulnerability DB/rule baseline capture.
+- Semgrep/gosec, Gitleaks, Trivy/Grype, Syft, Cosign/Notation, Crane,
+  kube-linter, conftest, Hadolint, ShellCheck scanner config placeholder.
+- source path, image list, digest list, Helm/YAML, RBAC, Dockerfile, script를
+  선언하는 artifact-input.example.yaml.
+- scanner version과 vulnerability DB/rule baseline capture.
 - scripts/run-security-assessment.sh orchestration skeleton.
-- scripts/verify-image-digest.sh for approved digest comparison.
-- scripts/normalize-findings.sh placeholder for scanner result normalization.
-- Scan health output for missing artifacts, unsupported targets, scanner
-  errors, stale baselines, and registry pull failures.
+- 승인 digest 비교를 위한 scripts/verify-image-digest.sh.
+- scanner 결과 정규화용 scripts/normalize-findings.sh placeholder.
+- missing artifact, unsupported target, scanner error, stale baseline,
+  registry pull failure를 나타내는 scan health output.
 
-Do not implement runtime event correlation, OSQuery, OTel/LGTM, or automatic
-remediation.
-M0.5 creates scanner configuration, input validation, baseline capture, and
-scan-health skeletons only. Actual delivery image vulnerability scanning is
-implemented in M5.
+runtime event correlation, OSQuery, OTel/LGTM, automatic remediation은 구현하지
+않는다. M0.5는 scanner config, input validation, baseline capture, scan-health
+skeleton만 만든다. 실제 납품 이미지 취약점 scanning은 M5에서 구현한다.
 
-Acceptance criteria:
+수용 기준:
 
-- go test ./... passes if Go packages exist.
-- go build ./... passes if Go packages exist.
-- Running the assessment script without required inputs reports scan health
-  failures rather than a false pass.
-- Required artifact inputs are documented.
-- Scanner baseline data is written with the report.
-- No Secret raw values are written to reports.
+- Go package가 존재하면 go test ./... 통과.
+- Go package가 존재하면 go build ./... 통과.
+- 필수 input 없이 assessment script를 실행하면 false pass가 아니라 scan health
+  failure를 보고.
+- 필수 artifact input이 문서화됨.
+- Scanner baseline data가 report와 함께 기록됨.
+- Secret raw value가 report에 기록되지 않음.
 ```
 
 ## P3 - M1 report store, schema, evidence, and dashboard backend
 
 ```text
-Implement M1 from docs/ROADMAP.md.
+docs/ROADMAP.md의 M1을 구현한다.
 
-Scope:
+범위:
 
-- Report Store interfaces for raw scanner reports, normalized findings, scan
-  health, final decision records, and evidence bundles.
-- Security Finding Schema and schema validator.
-- Stable finding ID and deduplication helpers.
-- Secret redaction guard for reports, logs, dashboard records, and artifacts.
-- Evidence bundle export structure.
-- Base dashboard/read-model records for Overview, Targets, Assessments,
-  Findings, Reports, and Governance.
+- raw scanner report, normalized finding, scan health, final decision record,
+  evidence bundle을 위한 Report Store interface.
+- filesystem, S3-compatible, SeaweedFS 등으로 확장 가능한 Artifact Store
+  backend plugin interface.
+- Security Finding Schema와 schema validator.
+- stable finding ID와 deduplication helper.
+- report, log, dashboard record, artifact 대상 Secret redaction guard.
+- evidence bundle export 구조.
+- Overview, Targets, Assessments, Findings, Reports, Governance를 위한 기본
+  dashboard/read-model record.
 
-Do not implement OTel/LGTM telemetry or Grafana-specific dashboards in this
-milestone.
+이 milestone에서는 OTel/LGTM telemetry 또는 Grafana 전용 dashboard를 구현하지
+않는다.
 
-Acceptance criteria:
+수용 기준:
 
-- go test ./... passes if Go packages exist.
-- go build ./... passes if Go packages exist.
-- Duplicate fixture findings produce the same stable finding ID.
-- Invalid normalized findings fail schema validation.
-- Evidence bundle references raw report, normalized findings, scan health,
-  final decision, and exception candidates.
-- Secret-like fixture values are redacted or rejected before persistence.
+- Go package가 존재하면 go test ./... 통과.
+- Go package가 존재하면 go build ./... 통과.
+- 중복 fixture finding이 같은 stable finding ID를 생성.
+- 잘못된 normalized finding은 schema validation 실패.
+- Evidence bundle이 raw report, normalized finding, scan health, final decision,
+  exception candidate를 참조.
+- Secret 형태의 fixture 값은 저장 전에 redaction 또는 reject 처리.
+- Artifact Store backend 선택이 finding metadata schema를 변경하지 않음.
 ```
 
 ## P4 - M2 management controller core and assessment scaffold
 
 ```text
-Implement M2 from docs/ROADMAP.md.
+docs/ROADMAP.md의 M2를 구현한다.
 
-Scope:
+범위:
 
-- ClusterTarget, SecurityAssessment, and ScanRun reconciler core.
-- Finalizer handling.
-- Assessment registry integration.
-- Desired state store.
-- Remote apply client skeleton using ClusterTarget kubeconfigRef.
-- Server-side apply skeleton with managed labels and annotations from
-  docs/ARCHITECTURE.md.
-- Status patching with observedGeneration and workflow conditions.
-- security_assessment feature scaffold that can create assessment Job/CronJob
-  resources without implementing all scanner logic.
-- Report writer skeleton for ScanRun results.
+- Mgmt Cluster 단일 operator 기준 ClusterTarget, SecurityAssessment, ScanRun
+  reconciler core.
+- finalizer handling.
+- feature registry와 Feature orchestrator integration.
+- desired state store.
+- ClusterTarget kubeconfigRef를 사용하는 remote apply client skeleton.
+- target namespace/RBAC/scanner resource에 대한 bootstrap policy handling.
+- docs/ARCHITECTURE.md의 managed label과 annotation을 포함한 server-side apply
+  skeleton.
+- observedGeneration과 workflow condition을 포함한 status patching.
+- 모든 scanner logic을 구현하지 않고 assessment Job/CronJob resource를 생성할
+  수 있는 security_assessment feature scaffold.
+- ScanRun 결과를 위한 report writer skeleton.
 
-Do not implement optional inventory, OTel/LGTM, runtime sensors, automatic
-remediation, or Trivy feature logic yet.
+optional inventory, OTel/LGTM, runtime sensor, automatic remediation, Trivy
+feature logic은 아직 구현하지 않는다.
+Biz Cluster에는 kube-sentinel operator 또는 CRD를 설치하지 않는다.
 
-Acceptance criteria:
+수용 기준:
 
-- go test ./... passes.
-- go build ./... passes.
-- Unit tests cover finalizer behavior, unknown feature status, registry
-  ordering, desired state labels, remote apply label generation, and status
-  phase calculation.
-- Sample ClusterTarget, SecurityAssessment, and ScanRun YAML exists for a
-  minimal assessment deployment.
+- go test ./... 통과.
+- go build ./... 통과.
+- unit test가 finalizer behavior, unknown feature status, registry ordering,
+  Feature orchestrator ordering, desired state label, remote apply label
+  generation, bootstrap policy guardrail, status phase calculation을 검증.
+- minimal assessment deployment용 sample ClusterTarget, SecurityAssessment,
+  ScanRun YAML 존재.
 ```
 
 ## P5 - M3 Security Assessment feature
 
 ```text
-Implement M3 from docs/ROADMAP.md: the Security Assessment feature.
+docs/ROADMAP.md의 M3, Security Assessment feature를 구현한다.
 
-Scope:
+범위:
 
-- security_assessment feature config defaults and validation.
-- Assessment Job/CronJob resources for delivery artifact scans.
-- Scanner config mount points and report output conventions.
-- Finding normalization invocation.
-- Scan health reporting for scanner failures and missing artifacts.
-- Artifact input manifest validation.
-- Scanner baseline capture.
+- security_assessment feature config default와 validation.
+- delivery artifact scan을 위한 Assessment Job/CronJob resource.
+- scanner config mount point와 report output convention.
+- finding normalization invocation.
+- scanner failure와 missing artifact에 대한 scan health reporting.
+- artifact input manifest validation.
+- scanner baseline capture.
 
-Do not implement optional inventory, Trivy delivery image scan, or applied
-cluster configuration scan yet.
+optional inventory, Trivy delivery image scan, applied cluster configuration
+scan은 아직 구현하지 않는다.
 
-Acceptance criteria:
+수용 기준:
 
-- go test ./... passes.
-- go build ./... passes.
-- Generated assessment resources contain kube-sentinel ownership labels.
-- Disabling the security_assessment feature removes or marks stale run-scoped
-  resources for GC.
-- Scanner failures are represented as scan health findings.
-- Evidence bundle output includes raw report and normalized finding references.
+- go test ./... 통과.
+- go build ./... 통과.
+- 생성된 assessment resource가 kube-sentinel ownership label을 포함.
+- security_assessment feature 비활성화 시 stale run-scoped resource가 GC 대상
+  으로 제거되거나 표시됨.
+- scanner failure가 scan health finding으로 표현됨.
+- Evidence bundle output이 raw report와 normalized finding reference를 포함.
 ```
 
 ## P6 - M4 Applied cluster configuration scan
 
 ```text
-Implement M4 from docs/ROADMAP.md: applied cluster configuration scan.
+docs/ROADMAP.md의 M4, applied cluster configuration scan을 구현한다.
 
-Scope:
+범위:
 
-- Read-only Kubernetes client access for approved namespaces.
-- Workload spec inspection for securityContext, volume, image, and
-  ServiceAccount settings.
-- RBAC inspection for Role, RoleBinding, ClusterRole, and ClusterRoleBinding
-  risks.
-- Secret reference inspection without reading raw Secret values.
-- Service/Ingress exposure inspection as an optional warning category.
-- Namespace allowlist validator.
-- Normalized findings for applied configuration risks.
+- 승인 namespace에 대한 read-only Kubernetes client access.
+- securityContext, volume, image, ServiceAccount setting에 대한 workload spec
+  inspection.
+- Role, RoleBinding, ClusterRole, ClusterRoleBinding risk에 대한 RBAC inspection.
+- Secret raw value를 읽지 않는 Secret reference inspection.
+- 선택 warning category로 Service/Ingress exposure inspection.
+- namespace allowlist validator.
+- applied configuration risk에 대한 normalized finding.
 
-Do not implement optional inventory, runtime sensors, or automatic remediation.
+optional inventory, runtime sensor, automatic remediation은 구현하지 않는다.
 
-Acceptance criteria:
+수용 기준:
 
-- go test ./... passes.
-- go build ./... passes.
-- Applied cluster inspection uses read-only permissions.
-- Secret raw values are not read or persisted.
-- Sample SecurityAssessment can enable security_assessment with applied cluster
-  scan settings.
-- Documentation includes validation commands and expected report fields.
+- go test ./... 통과.
+- go build ./... 통과.
+- Applied cluster inspection이 read-only permission을 사용.
+- Secret raw value를 읽거나 저장하지 않음.
+- Sample SecurityAssessment가 applied cluster scan setting으로
+  security_assessment를 활성화 가능.
+- 문서가 validation command와 예상 report field를 포함.
 ```
 
 ## P7 - M5 Trivy delivery image scan and integrity
 
 ```text
-Implement M5 from docs/ROADMAP.md: Trivy delivery image scan plus image
-integrity.
+docs/ROADMAP.md의 M5, Trivy delivery image scan과 image integrity를 구현한다.
 
-Scope:
+범위:
 
-- trivy feature config defaults and validation for delivery image scanning.
-- Registry digest or image tar scan flow.
-- SBOM generation using Syft or Trivy SBOM output.
-- Digest verification using Crane and approved digest lists.
-- Optional signature verification hook for Cosign or Notation.
-- Optional read-only Trivy Operator VulnerabilityReport ingestion when the CRD
-  exists and the ClusterTarget has get/list/watch permission.
-- Deterministic finding ID:
+- delivery image scanning을 위한 trivy feature config default와 validation.
+- registry digest 또는 image tar scan flow.
+- Syft 또는 Trivy SBOM output을 사용하는 SBOM generation.
+- Crane과 승인 digest list를 사용하는 digest verification.
+- Cosign 또는 Notation을 위한 선택 signature verification hook.
+- CRD가 존재하고 ClusterTarget에 get/list/watch permission이 있을 때 선택적으로
+  read-only Trivy Operator VulnerabilityReport ingestion.
+- deterministic finding ID:
   <imageRepository>/<imageDigest>/<vulnerabilityID>/<packageName>
-- Tests for duplicate-safe finding generation across direct Trivy scan and
-  optional VulnerabilityReport input.
+- direct Trivy scan과 optional VulnerabilityReport input 간 duplicate-safe
+  finding generation test.
 
-Do not install or operate Trivy Operator as part of this milestone. Do not fail
-the whole assessment when VulnerabilityReport is unavailable; record optional
-input unavailable in scan health.
+이 milestone의 일부로 Trivy Operator를 설치하거나 운영하지 않는다.
+VulnerabilityReport를 사용할 수 없어도 전체 assessment를 실패 처리하지 않고,
+optional input unavailable을 scan health에 기록한다.
 
-Acceptance criteria:
+수용 기준:
 
-- go test ./... passes.
-- go build ./... passes.
-- Duplicate Trivy fixture ingestion produces the same finding ID.
-- Optional VulnerabilityReport fixture ingestion normalizes to the same finding
-  schema.
-- Vulnerability findings are written to Report Store records and evidence
-  bundles.
-- Documentation includes install-independent verification commands.
+- go test ./... 통과.
+- go build ./... 통과.
+- 중복 Trivy fixture ingestion이 같은 finding ID를 생성.
+- Optional VulnerabilityReport fixture ingestion이 동일 finding schema로 정규화.
+- Vulnerability finding이 Report Store record와 evidence bundle에 기록됨.
+- 문서가 설치와 독립적인 verification command를 포함.
 ```
 
 ## P8 - M6 Phase 2 optional inventory/telemetry extension
 
 ```text
-Implement M6 from docs/ROADMAP.md only if Phase 2 inventory or telemetry is
-approved after a separate design review.
+별도 설계 검토 후 Phase 2 inventory 또는 telemetry가 승인된 경우에만
+docs/ROADMAP.md의 M6를 구현한다.
 
-Scope candidates:
+범위 후보:
 
-- OSQuery or equivalent inventory sensor.
-- OTel/LGTM export path from normalized findings and report events.
-- Runtime event or drift assessment.
-- Long-running sensor DaemonSet model.
+- OSQuery 또는 동등한 inventory sensor.
+- normalized finding과 report event에서 OTel/LGTM로 export하는 path.
+- runtime event 또는 drift assessment.
+- long-running sensor DaemonSet model.
 
-Do not implement this during the first final-check PoC unless the product scope
-explicitly requires it.
+제품 범위가 명시적으로 요구하지 않는 한 1차 final-check PoC에서는 구현하지
+않는다.
 
-Acceptance criteria must be defined in a separate design document before work
-starts.
+작업 시작 전에 별도 설계 문서에서 수용 기준을 정의해야 한다.
 ```
 
 ## P9 - M7 Final Check Dashboard
 
 ```text
-Implement M7 from docs/ROADMAP.md and docs/FRONTEND_ARCHITECTURE.md.
+docs/ROADMAP.md와 docs/FRONTEND_ARCHITECTURE.md의 M7을 구현한다.
 
-Scope:
+범위:
 
-- Final Check Dashboard assets for Overview, Targets, Assessments, Findings,
-  Reports, and Governance.
-- Findings table or documented panel query conventions.
-- Report menu for final-check reports, evidence bundles, raw reports,
-  normalized findings, and scan health summaries.
-- Dashboard variables for environment, target version/build, scan run ID,
-  namespace, image, severity, category, scanner, scan status, and exception
-  status.
+- Overview, Targets, Assessments, Findings, Reports, Governance를 위한 Final
+  Check Dashboard asset.
+- Findings table 또는 문서화된 panel query convention.
+- final-check report, evidence bundle, raw report, normalized finding,
+  scan health summary를 위한 Reports menu.
+- environment, target version/build, scan run ID, namespace, image, severity,
+  category, scanner, scan status, exception status dashboard variable.
 
-Acceptance criteria:
+수용 기준:
 
-- go test ./... passes if Go packages exist.
-- go build ./... passes if Go packages exist.
-- Dashboard assets or setup instructions are deterministic.
-- Screenshots or documented queries cover each menu.
-- Reports menu exposes evidence bundle and final decision data.
+- Go package가 존재하면 go test ./... 통과.
+- Go package가 존재하면 go build ./... 통과.
+- Dashboard asset 또는 setup instruction이 deterministic.
+- screenshot 또는 문서화된 query가 각 menu를 포함.
+- Reports menu가 evidence bundle과 final decision data를 노출.
 ```
 
 ## P10 - M8 final-check validation
 
 ```text
-Implement M8 from docs/ROADMAP.md.
+docs/ROADMAP.md의 M8을 구현한다.
 
-Scope:
+범위:
 
-- End-to-end validation assets for Code / Artifact Scan, Biz Cluster Scan, and
-  Full Final Check.
-- Garbage collection verification for disabled profiles and stale ScanRuns.
-- Delivery artifact assessment validation.
-- Applied cluster configuration assessment validation.
+- Code / Artifact Scan, Biz Cluster Scan, Full Final Check를 위한 end-to-end
+  validation asset.
+- disabled profile과 stale ScanRun에 대한 garbage collection verification.
+- delivery artifact assessment validation.
+- applied cluster configuration assessment validation.
 - Secret redaction validation.
-- Evidence bundle and exception review validation.
-- No-auto-remediation guardrail validation.
-- Documentation of expected kubectl diff/get output and final-check report
-  output.
+- evidence bundle과 exception review validation.
+- no-auto-remediation guardrail validation.
+- 예상 kubectl diff/get output과 final-check report output 문서화.
 
-Acceptance criteria:
+수용 기준:
 
-- go test ./... passes.
-- go build ./... passes.
-- Validation scripts cover security_assessment and trivy.
-- Stale resource cleanup behavior is documented.
-- Final-check report output includes scan health, evidence bundle references,
-  exception status, and no automatic Biz Cluster infrastructure mutation.
+- go test ./... 통과.
+- go build ./... 통과.
+- validation script가 security_assessment와 trivy를 포함.
+- stale resource cleanup behavior가 문서화됨.
+- final-check report output이 scan health, evidence bundle reference, exception
+  status, 자동 Biz Cluster infrastructure mutation 없음 정보를 포함.
 ```
 
-## Prompt quality checklist
+## 프롬프트 품질 체크리스트
 
-Before running `orchestrator run`, verify the prompt has:
+`orchestrator run` 실행 전에 prompt가 다음을 포함하는지 확인한다.
 
-- A single milestone target.
-- Explicit files or modules in scope.
-- Explicit out-of-scope items.
-- At least three acceptance criteria.
-- Required verification commands.
-- References to docs rather than restating the whole plan.
+- 단일 milestone target.
+- 범위에 포함되는 file 또는 module.
+- 범위에서 제외되는 항목.
+- 최소 3개 이상의 수용 기준.
+- 필수 verification command.
+- 전체 plan을 다시 쓰지 않고 docs를 참조하는 방식.
