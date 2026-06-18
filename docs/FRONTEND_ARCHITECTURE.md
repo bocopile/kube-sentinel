@@ -30,6 +30,7 @@
 ```text
 Final Check Dashboard
 ├── Overview
+├── Clusters
 ├── Run Scan
 ├── Findings
 ├── Source & Secrets
@@ -45,6 +46,7 @@ Final Check Dashboard
 | 메뉴 | 목적 | 주요 기능 |
 |------|------|----------|
 | Overview | 납품 가능 여부 요약 | Pass/Fail, Critical/High, failed scans, missing artifacts, exception-required count |
+| Clusters | Biz Cluster 등록 상태 확인 | ClusterTarget list, connection phase, capability status, namespace allowlist, last validation time |
 | Run Scan | 카테고리별 검사 실행 | Source Security, Image Supply Chain, Kubernetes Config, RBAC & Secret Reference, Build & Deploy, Full Final Check |
 | Findings | 전체 finding 통합 목록 | severity/category/scanner/target/status 필터, finding 상세 drawer |
 | Source & Secrets | 코드와 민감정보 위험 분석 | SonarQube/Semgrep/gosec/Gitleaks 결과, 파일 위치, rule, remediation |
@@ -76,13 +78,34 @@ Final Check Dashboard
 | Environment | `dev`, `final-check` |
 | Target version/build | 납품 대상 버전 또는 build ID |
 | Scan run ID | 검사 실행 단위 |
-| Namespace | 개발 cluster 적용 설정 검수 범위 |
+| Namespace | Biz Cluster 적용 설정 검수 범위 |
 | Image | 이미지 repository, tag, digest |
 | Severity | Critical, High, Medium, Low, Info |
 | Category | `sast`, `secret`, `image_vulnerability`, `sbom`, `integrity`, `kubernetes`, `rbac`, `dockerfile`, `script`, `scan_health` |
 | Scanner | SonarQube, Semgrep, gosec, Gitleaks, Trivy, Grype, Syft, Cosign, kube-linter, conftest, Hadolint, ShellCheck |
 | Scan status | Pass, Fail, Error, Skipped, Unsupported |
 | Exception status | None, Required, Requested, Approved, Expired, Rejected |
+
+## Cluster List
+
+`Clusters` 메뉴는 Mgmt Cluster의 `ClusterTarget` CR과 status를 조회해
+Biz Cluster 목록을 표시한다. kubeconfig Secret data는 어떤 UI/API에서도
+노출하지 않는다.
+
+| 컬럼 | 출처 | 설명 |
+|------|------|------|
+| Name | `metadata.name` | 내부 Biz Cluster ID |
+| Display name | `spec.displayName` | 사용자 표시 이름 |
+| Environment | `spec.environment` | dev, final-check 등 |
+| Phase | `status.phase` | Ready, Degraded, AuthFailed, Unreachable, PermissionDenied |
+| Kubernetes version | `status.kubernetesVersion` | Biz Cluster discovery 결과 |
+| Last validated | `status.lastValidatedAt` | 마지막 연결/RBAC 검증 시각 |
+| Capabilities | `status.capabilities` | privileged, hostPath, BTF, egress, image pull 가능 여부 |
+| Namespace allowlist | `spec.namespaceAllowlist` | 검사 허용 namespace |
+
+Cluster detail 화면은 connectivity error, RBAC denied, egress blocked, image
+pull failure 같은 상태를 remediation과 함께 보여준다. Credential rotation은
+상태와 마지막 회전 시각만 표시하고 Secret 값은 표시하지 않는다.
 
 ## Finding Detail
 

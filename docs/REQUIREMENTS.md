@@ -2,22 +2,21 @@
 
 ## Goal
 
-kube-sentinel is a Kubernetes security telemetry PoC. A single
-`SecurityAgent` custom resource should deploy and manage security sensors,
-an OpenTelemetry pipeline, delivery artifact security assessment, applied
-cluster configuration assessment, and Grafana LGTM outputs for CTEM-oriented
-security visibility.
+kube-sentinel is a Mgmt Cluster based Kubernetes final-check security
+assessment PoC. Mgmt Cluster CRDs should register Biz Clusters, run delivery
+artifact security assessment, inspect applied Biz Cluster configuration through
+remote apply/read-only access, and publish results to Grafana LGTM.
 
 ## Success criteria
 
 | ID | Requirement | Verification |
 | --- | --- | --- |
-| G1 | Applying one `SecurityAgent` CR creates the enabled sensors and OTel pipeline. | `kubectl apply` followed by `kubectl get ds,deploy,cm,secret` in the target namespace. |
+| G1 | Creating `ClusterTarget` and `SecurityAssessment` CRs lets the management controller create enabled assessment workloads on selected Biz Clusters. | `kubectl get clustertarget,securityassessment,scanrun` in the Mgmt Cluster and `kubectl get job,cronjob,deploy,cm` in the Biz Cluster target namespace. |
 | G2 | Feature toggles create or remove each feature's managed resources. | Patch `spec.features[].enabled` and verify resource creation/deletion. |
 | G3 | Overrides can change resources and scheduling fields for selected features. | Patch `spec.override`, then inspect generated workload specs. |
-| G4 | Falco, Tetragon, OSquery, Trivy, and security assessment data lands in CTEM-specific LGTM streams and metrics. | Query Loki streams and Mimir counters for events, inventory, vulnerabilities, and findings. |
+| G4 | OSquery, Trivy, and security assessment data lands in CTEM-specific LGTM streams and metrics. | Query Loki streams and Mimir counters for inventory, vulnerabilities, and findings. |
 | G5 | Grafana dashboards expose event, inventory, vulnerability, and final-check security assessment views. | Capture dashboard screenshots. |
-| G6 | MITRE ATT&CK validation scenarios produce detectable events. | Run scenario script and query Loki/Mimir for expected fields. |
+| G6 | Final Check Dashboard exposes the assessment result by decision-oriented menus. | Capture dashboard screenshots. |
 | G7 | CTEM mapping checklist passes for Scope, Discovery, Priority, and Validation. | Fill and review `docs/ctem-mapping-results.md`. |
 | G8 | Source code static analysis identifies risky code and security anti-patterns. | Review Semgrep/gosec reports. |
 | G9 | Hardcoded secrets, tokens, credentials, and account information are detected. | Review Gitleaks reports. |
@@ -29,7 +28,7 @@ security visibility.
 
 ## Non-goals
 
-- Multi-cluster management.
+- Per-Biz-Cluster operator installation.
 - Inline blocking or policy enforcement.
 - Kafka or streaming middleware.
 - Complete OCSF normalization.
@@ -38,9 +37,9 @@ security visibility.
 ## Required project capabilities
 
 - A Go Kubernetes operator built with controller-runtime.
-- `SecurityAgent` CRD under `security.kube-sentinel.io/v1alpha1`.
+- `ClusterTarget`, `SecurityAssessment`, and `ScanRun` CRDs under `security.kube-sentinel.io/v1alpha1`.
 - Feature-as-plugin architecture using a registry and feature priorities.
-- Server-side apply for managed Kubernetes resources.
+- Server-side apply for Mgmt-local and Biz-remote Kubernetes resources.
 - Status reporting for feature readiness, config errors, apply errors, and degraded runtime state.
 - OTel Node Collector and Gateway configuration generation.
 - Grafana LGTM routing for events, inventory, vulnerabilities, and normalized security findings.
@@ -48,15 +47,16 @@ security visibility.
 - Applied cluster configuration assessment for Pod security settings, RBAC, Secret references, ServiceAccount token behavior, and Service/Ingress exposure.
 - Scan health reporting for scanner errors, unsupported targets, missing required artifacts, and stale vulnerability databases or policy rules.
 - Exception and remediation tracking for findings that require approval before delivery.
-- MITRE scenario test assets.
+- Final Check Dashboard assets.
 
 ## Environment assumptions
 
-- Kubernetes cluster allows the required privileged DaemonSets and hostPath mounts.
-- Worker nodes expose `/sys/kernel/btf/vmlinux` for eBPF-based tools.
+- Mgmt Cluster stores Biz Cluster kubeconfig Secrets and runs the kube-sentinel management controller.
+- Biz Clusters allow the required assessment jobs and optional inventory DaemonSets.
 - Loki, Mimir, Tempo, and Grafana are available in or reachable from the cluster.
-- Falco, Tetragon, OSquery, Trivy Operator, OTel Collector, and required images can be installed.
-- The development cluster can be queried with read-only credentials scoped to approved namespaces and cluster-level RBAC resources required for applied configuration assessment.
+- OSquery, OTel Collector, image scanners, and required images can be installed.
+- Biz Clusters can be queried with read-only credentials scoped to approved namespaces and cluster-level RBAC resources required for applied configuration assessment.
+- Target kubeconfig Secret data is never exposed through status, dashboards, logs, or reports.
 - Private registry access, approved image digest lists, and optional offline image tar artifacts are available for image vulnerability and integrity checks.
 - Vulnerability databases and scanner rule sets are updated or pinned to an approved baseline date before final-check execution.
 - Secret values must not be collected or written to reports; only Secret references, mounts, environment references, and ServiceAccount token settings are assessed.

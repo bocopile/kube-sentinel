@@ -1,14 +1,12 @@
 # Orchestrator prompts
 
 Use these prompts with `orchestrator plan` first, then `orchestrator run` only
-after the plan looks acceptable. If the local orchestrator build does not yet
-support `plan` and `run`, use the same prompt text directly in Claude Code for
-P0 through P3, then return to orchestrator after its Phase 1 skeleton is ready.
+after the plan looks acceptable.
 
-All prompts assume the project root is:
+All prompts assume the project root is the current checkout of:
 
-```bash
-/Users/bhshin/projects/kube-sentinel
+```text
+github.com/bocopile/kube-sentinel
 ```
 
 ## Command pattern
@@ -32,17 +30,17 @@ task graph.
 
 | Prompt | Roadmap stage | Roadmap milestone | Purpose |
 | --- | --- | --- | --- |
-| P0 | Foundation | First implementation block | Go operator skeleton and core API contracts. |
-| P1 | S0 | M0 | Cluster prerequisite checks. |
-| P2 | S1 | M0.5 | OTel/parser spike and fixture routing. |
-| P3 | S2 | M1 | Elasticsearch, Kibana, and index templates. |
-| P4 | S2 | M2 | Operator core and OTel pipeline feature. |
-| P5 | S2 | M3 | Falco vertical slice. |
-| P6 | S3 | M4 | Tetragon feature. |
+| P0 | Foundation | First implementation block | Go management controller skeleton and core API contracts. |
+| P1 | S0 | M0 | Cluster prerequisite checks and LGTM connectivity. |
+| P2 | S0.5 | M0.5 | Delivery artifact security assessment baseline. |
+| P3 | S1 | M1 | Grafana LGTM backend and base dashboard checks. |
+| P4 | S2 | M2 | Operator core, OTel feature, and security assessment scaffold. |
+| P5 | S2 | M3 | Security Assessment feature. |
+| P6 | S3 | M4 | Applied cluster configuration scan. |
 | P7 | S3 | M5 | OSquery feature. |
-| P8 | S3 | M6 | Trivy feature. |
-| P9 | S4 | M7 | MITRE scenarios and Kibana dashboards. |
-| P10 | S4 | M8 | Feature toggle, override, and garbage collection validation. |
+| P8 | S3 | M6 | Trivy delivery image scan and image integrity feature. |
+| P9 | S4 | M7 | Final Check Dashboard. |
+| P10 | S4 | M8 | Toggle, override, final-check validation, and garbage collection. |
 
 ## Global instruction block
 
@@ -50,17 +48,15 @@ Add this block to milestone prompts when the request is complex:
 
 ```text
 Use docs/PLAN.md as the source plan, and use docs/REQUIREMENTS.md,
-docs/ARCHITECTURE.md, docs/ROADMAP.md, and docs/ORCHESTRATOR.md as the
-implementation contract. Keep changes scoped to the requested milestone. Do not
-implement later sensors or dashboards unless they are explicitly part of the
-milestone. Preserve buildability after the change. Add focused tests for new
-logic. Verification must include go test ./... and go build ./....
+docs/ARCHITECTURE.md, docs/SECURITY_ASSESSMENT.md,
+docs/FRONTEND_ARCHITECTURE.md, docs/ROADMAP.md, and docs/ORCHESTRATOR.md as
+the implementation contract. Keep changes scoped to the requested milestone.
+Do not implement later sensors or dashboards unless they are explicitly part of
+the milestone. Preserve buildability after the change. Add focused tests for
+new logic. Verification must include go test ./... and go build ./....
 ```
 
 ## P0 - Create project skeleton
-
-Use this after Kubebuilder has initialized the repository, or adapt it if the
-operator skeleton is created manually.
 
 ```text
 Use docs/PLAN.md, docs/REQUIREMENTS.md, docs/ARCHITECTURE.md, and
@@ -68,37 +64,39 @@ docs/ROADMAP.md as the project contract.
 
 Implement the first kube-sentinel code block from docs/ROADMAP.md only:
 
-- Ensure this is a Go Kubernetes operator project.
-- Add or complete the cluster-scoped SecurityAgent API type under api/v1alpha1.
+- Ensure this is a Go Kubernetes management controller project using module
+  github.com/bocopile/kube-sentinel.
+- Add or complete ClusterTarget, SecurityAssessment, and ScanRun API types under
+  api/v1alpha1.
 - Add an empty but buildable controller reconciler.
 - Add feature registry interfaces and deterministic priority ordering.
 - Add tests for registry ordering and unknown feature validation.
-- Do not implement Falco, Tetragon, OSquery, Trivy, OTel manifests, or
-  Elasticsearch integration yet.
+- Do not implement OSquery, Trivy, OTel manifests, LGTM
+  integration, security assessment jobs, or dashboards yet.
 
 Acceptance criteria:
 
 - go test ./... passes.
 - go build ./... passes.
-- The SecurityAgent type contains spec fields for global, features, output,
-  override, and tests.
-- The SecurityAgent CRD is cluster-scoped and uses
-  spec.global.targetNamespace for namespaced workloads.
+- ClusterTarget contains target kubeconfigRef, targetNamespace,
+  namespaceAllowlist, output, capabilities, and status fields.
+- SecurityAssessment contains selected targets and scan profiles.
+- ScanRun contains scan execution status and per-target results.
 - Unknown feature names can be detected and reported by pure Go unit tests.
 - Registry ordering is deterministic by priority and feature ID.
 ```
 
-## P1 - S0 cluster prerequisite checks
+## P1 - M0 infrastructure readiness checks
 
 ```text
-Use docs/ROADMAP.md S0 as the target.
+Use docs/ROADMAP.md S0/M0 as the target.
 
 Implement cluster prerequisite assets for kube-sentinel:
 
 - Namespace manifest for kube-sentinel-system.
 - A privileged preflight DaemonSet or Job that verifies required host access.
 - A script that checks /sys/kernel/btf/vmlinux from a node-level pod.
-- A script or manifest for writing a test document to Elasticsearch.
+- A script or manifest for sending test telemetry to Loki, Mimir, and Tempo.
 - Documentation for how to run and interpret the checks.
 
 Do not implement sensor deployment yet.
@@ -109,48 +107,50 @@ Acceptance criteria:
 - go build ./... passes.
 - Kubernetes YAML can be rendered or applied with documented commands.
 - The preflight check reports privileged workload status, BTF availability, and
-  Elasticsearch write connectivity.
+  LGTM write connectivity.
 ```
 
-## P2 - S1 OTel and parser spike
+## P2 - M0.5 delivery artifact security assessment baseline
 
 ```text
-Use docs/ROADMAP.md S1 and docs/ARCHITECTURE.md data routing as the target.
+Use docs/SECURITY_ASSESSMENT.md and docs/ROADMAP.md S0.5/M0.5 as the target.
 
-Implement a local OTel/parser spike:
+Implement the first security assessment baseline:
 
-- Add sample log fixtures for Falco, Tetragon, and OSquery.
-- Add a Trivy VulnerabilityReport fixture.
-- Add OTel config fragments or generator code sufficient to route fixtures to
-  security-events, security-inventory, and security-vuln according to
-  docs/ARCHITECTURE.md.
-- Add tests that validate routing decisions and stable Trivy document IDs.
+- Scanner configuration placeholders for Semgrep/gosec, Gitleaks, Trivy/Grype,
+  Syft, Cosign/Notation, Crane, kube-linter, conftest, Hadolint, and ShellCheck.
+- scripts/run-security-assessment.sh orchestration skeleton.
+- scripts/verify-image-digest.sh for approved digest comparison.
+- scripts/normalize-findings.sh placeholder for scanner result normalization.
+- Report directory conventions for raw reports, normalized findings, and scan
+  health.
 
-Do not deploy real Falco, Tetragon, OSquery, or Trivy yet.
+Do not implement runtime event correlation or Trivy Operator
+VulnerabilityReport ingestion.
 
 Acceptance criteria:
 
-- go test ./... passes.
-- go build ./... passes.
-- Fixtures cover one event from each source.
-- Routing logic maps Falco and Tetragon to security-events, OSquery to
-  security-inventory, and Trivy to security-vuln.
-- Trivy upsert document ID is deterministic.
+- go test ./... passes if Go packages exist.
+- go build ./... passes if Go packages exist.
+- Running the assessment script without required inputs reports scan health
+  failures rather than a false pass.
+- Required artifact inputs are documented.
+- No Secret raw values are written to reports.
 ```
 
-## P3 - M1 Elasticsearch and Kibana
+## P3 - M1 Grafana LGTM backend
 
 ```text
-Implement M1 from docs/ROADMAP.md: Elasticsearch and Kibana infrastructure for
-the kube-sentinel PoC.
+Implement M1 from docs/ROADMAP.md: Grafana LGTM backend for the kube-sentinel
+PoC.
 
 Scope:
 
-- Kubernetes manifests or scripts for ECK-based Elasticsearch and Kibana.
-- Index template setup for security-events, security-inventory, and
-  security-vuln.
-- Secret and TLS assumptions documented without committing real credentials.
-- A test-document write script for each index.
+- Kubernetes manifests or Helm values for Loki, Mimir, Tempo, and Grafana.
+- Datasource provisioning for Loki, Mimir, and Tempo.
+- Basic dashboard assets for event, inventory, vulnerability, and security
+  finding signals.
+- Test telemetry scripts for Loki logs, Mimir metrics, and Tempo traces.
 - Documentation for install, readiness checks, and teardown.
 
 Do not implement the kube-sentinel operator, OTel pipeline, or sensors in this
@@ -158,80 +158,88 @@ milestone.
 
 Acceptance criteria:
 
-- go test ./... passes if Go code exists.
-- go build ./... passes if Go code exists.
-- Manifests or scripts are deterministic and documented.
-- Index templates cover the three CTEM indices.
-- Documentation includes kubectl checks for Elasticsearch/Kibana readiness and
-  curl examples for test document insertion.
+- go test ./... passes if Go packages exist.
+- go build ./... passes if Go packages exist.
+- Manifests or values are deterministic and documented.
+- Grafana datasources are provisioned.
+- Documentation includes kubectl checks and sample LogQL/PromQL queries.
 ```
 
-## P4 - M2 operator core and OTel feature
+## P4 - M2 management controller core, OTel feature, and assessment scaffold
 
 ```text
 Implement M2 from docs/ROADMAP.md.
 
 Scope:
 
-- SecurityAgent reconciler core.
+- ClusterTarget, SecurityAssessment, and ScanRun reconciler core.
 - Finalizer handling.
 - Feature registry integration.
 - Desired state store.
+- Remote apply client skeleton using ClusterTarget kubeconfigRef.
 - Override hook structure.
 - Server-side apply skeleton with managed labels and annotations from
   docs/ARCHITECTURE.md.
 - Status patching with observedGeneration and feature conditions.
 - otel_pipeline feature that contributes buildable Kubernetes objects.
+- security_assessment feature scaffold that can create assessment Job/CronJob
+  resources without implementing all scanner logic.
 
-Do not implement Falco, Tetragon, OSquery, or Trivy features yet.
-
-Acceptance criteria:
-
-- go test ./... passes.
-- go build ./... passes.
-- Unit tests cover finalizer behavior, unknown feature status, registry ordering,
-  desired state labels, and status phase calculation.
-- Sample SecurityAgent YAML exists for minimal OTel pipeline deployment.
-```
-
-## P5 - M3 Falco vertical slice
-
-```text
-Implement M3 from docs/ROADMAP.md: the Falco feature vertical slice.
-
-Scope:
-
-- falco feature config defaults and validation.
-- Falco DaemonSet, ConfigMap, RBAC, and required hostPath mounts.
-- File output to /var/log/kube-sentinel/falco/events.log.
-- OTel receiver fragment for Falco filelog input.
-- Readiness assessment and status reason handling.
-- Sample SecurityAgent enabling otel_pipeline and falco.
-
-Do not implement Tetragon, OSquery, or Trivy.
+Do not implement OSquery or Trivy feature logic yet.
 
 Acceptance criteria:
 
 - go test ./... passes.
 - go build ./... passes.
-- Generated Falco resources contain kube-sentinel ownership labels.
-- Disabling the Falco feature removes or marks stale Falco resources for GC.
-- Documentation includes the kubectl and Elasticsearch checks for shell
-  execution detection.
+- Unit tests cover finalizer behavior, unknown feature status, registry
+  ordering, desired state labels, remote apply label generation, and status
+  phase calculation.
+- Sample ClusterTarget, SecurityAssessment, and ScanRun YAML exists for a
+  minimal assessment deployment.
 ```
 
-## P6 - M4 Tetragon feature
+## P5 - M3 Security Assessment feature
 
 ```text
-Implement M4 from docs/ROADMAP.md: the Tetragon feature.
+Implement M3 from docs/ROADMAP.md: the Security Assessment feature.
 
 Scope:
 
-- tetragon feature config defaults and validation.
-- Tetragon workload/resources needed for the PoC.
-- TracingPolicy resources for process execution and container escape monitoring.
-- OTel receiver fragment for Tetragon pod logs.
-- Readiness assessment and status updates.
+- security_assessment feature config defaults and validation.
+- Assessment Job/CronJob resources for delivery artifact scans.
+- Scanner config mount points and report output conventions.
+- Finding normalization invocation.
+- Scan health reporting for scanner failures and missing artifacts.
+- Sample SecurityAssessment enabling otel_pipeline and security_assessment.
+
+Do not implement OSquery, Trivy delivery image scan, or applied cluster
+configuration scan yet.
+
+Acceptance criteria:
+
+- go test ./... passes.
+- go build ./... passes.
+- Generated assessment resources contain kube-sentinel ownership labels.
+- Disabling the security_assessment feature removes or marks stale resources
+  for GC.
+- Scanner failures are represented as scan health findings.
+```
+
+## P6 - M4 Applied cluster configuration scan
+
+```text
+Implement M4 from docs/ROADMAP.md: applied cluster configuration scan.
+
+Scope:
+
+- Read-only Kubernetes client access for approved namespaces.
+- Workload spec inspection for securityContext, volume, image, and
+  ServiceAccount settings.
+- RBAC inspection for Role, RoleBinding, ClusterRole, and ClusterRoleBinding
+  risks.
+- Secret reference inspection without reading raw Secret values.
+- Service/Ingress exposure inspection as an optional warning category.
+- Normalized findings for applied configuration risks.
 
 Do not implement OSquery or Trivy.
 
@@ -239,9 +247,11 @@ Acceptance criteria:
 
 - go test ./... passes.
 - go build ./... passes.
-- Tetragon resources contain kube-sentinel ownership labels.
-- Sample SecurityAgent can enable otel_pipeline, falco, and tetragon.
-- Documentation includes validation commands and expected Elasticsearch fields.
+- Applied cluster inspection uses read-only permissions.
+- Secret raw values are not read or persisted.
+- Sample SecurityAssessment can enable otel_pipeline and security_assessment
+  with applied cluster scan settings.
+- Documentation includes validation commands and expected Loki/Grafana fields.
 ```
 
 ## P7 - M5 OSquery feature
@@ -263,59 +273,69 @@ Acceptance criteria:
 
 - go test ./... passes.
 - go build ./... passes.
-- OSquery inventory documents route to security-inventory.
-- Sample SecurityAgent can enable otel_pipeline and osquery.
-- Documentation includes query and Elasticsearch verification commands.
+- OSquery inventory documents route to Loki inventory streams and Mimir
+  inventory counters.
+- Sample SecurityAssessment can enable otel_pipeline and osquery for selected
+  ClusterTargets.
+- Documentation includes query and LGTM verification commands.
 ```
 
-## P8 - M6 Trivy feature
+## P8 - M6 Trivy delivery image scan and integrity
 
 ```text
-Implement M6 from docs/ROADMAP.md: the Trivy feature.
+Implement M6 from docs/ROADMAP.md: Trivy delivery image scan plus image
+integrity.
 
 Scope:
 
-- trivy feature config defaults and validation.
-- Trivy Operator integration assumptions and manifests.
-- VulnerabilityReport reader or CronJob design for Elasticsearch bulk upsert.
-- Deterministic document ID:
-  <clusterName>/<namespace>/<workloadKind>/<workloadName>/<containerName>/<vulnerabilityID>/<packageName>
-- Tests for duplicate-safe upsert payload generation.
-- Readiness assessment and status updates.
+- trivy feature config defaults and validation for delivery image scanning.
+- Registry digest or image tar scan flow.
+- SBOM generation using Syft or Trivy SBOM output.
+- Digest verification using Crane and approved digest lists.
+- Optional signature verification hook for Cosign or Notation.
+- Deterministic finding ID:
+  <imageRepository>/<imageDigest>/<vulnerabilityID>/<packageName>
+- Tests for duplicate-safe finding generation.
+
+Do not implement Trivy Operator VulnerabilityReport ingestion in this milestone.
+That is a Next Version extension.
 
 Acceptance criteria:
 
 - go test ./... passes.
 - go build ./... passes.
-- Duplicate Trivy fixture ingestion produces the same document ID.
-- Vulnerability documents route to security-vuln.
+- Duplicate Trivy fixture ingestion produces the same finding ID.
+- Vulnerability findings route to Loki vulnerability/security_finding streams
+  and Mimir counters.
 - Documentation includes install and verification commands.
 ```
 
-## P9 - M7 MITRE scenarios and Kibana dashboards
+## P9 - M7 Final Check Dashboard
 
 ```text
-Implement M7 from docs/ROADMAP.md.
+Implement M7 from docs/ROADMAP.md and docs/FRONTEND_ARCHITECTURE.md.
 
 Scope:
 
-- test/pods.yaml for testbox, attacker, and target-nginx.
-- test/run-ctem-scenarios.sh with MITRE scenarios from docs/PLAN.md.
-- Elasticsearch query checks for each scenario.
-- Kibana dashboard export or documented dashboard creation assets for events,
-  inventory, and vulnerabilities.
+- Final Check Dashboard assets for Overview, Source & Secrets, Images &
+  Integrity, Kubernetes Config & RBAC, Dockerfile & Scripts, Scan Health, and
+  Exceptions & Remediation.
+- Findings table or documented panel query conventions.
+- Dashboard variables for environment, target version/build, scan run ID,
+  namespace, image, severity, category, scanner, scan status, and exception
+  status.
 - docs/ctem-mapping-results.md template.
 
 Acceptance criteria:
 
-- go test ./... passes.
-- go build ./... passes.
-- Scenario script has clear pass/fail output.
-- At least five scenarios are represented.
+- go test ./... passes if Go packages exist.
+- go build ./... passes if Go packages exist.
+- Dashboard assets or setup instructions are deterministic.
+- Screenshots or documented queries cover each menu.
 - CTEM results template maps Scope, Discovery, Priority, and Validation.
 ```
 
-## P10 - M8 toggle and override validation
+## P10 - M8 toggle, override, and final-check validation
 
 ```text
 Implement M8 from docs/ROADMAP.md.
@@ -325,16 +345,21 @@ Scope:
 - End-to-end validation assets for feature enable/disable.
 - Override validation for nodeAgent and feature-specific resource overrides.
 - Garbage collection verification for disabled features.
-- Documentation of expected kubectl diff/get output.
+- Delivery artifact assessment validation.
+- Applied cluster configuration assessment validation.
+- Documentation of expected kubectl diff/get output and final-check report
+  output.
 
 Acceptance criteria:
 
 - go test ./... passes.
 - go build ./... passes.
-- Feature toggle tests or scripts cover at least Falco and one additional sensor.
+- Feature toggle tests or scripts cover security_assessment and one additional
+  feature.
 - Override tests or scripts verify resources and tolerations are reflected in
   generated workload specs.
 - Stale resource cleanup behavior is documented.
+- Final-check report output includes scan health and exception status.
 ```
 
 ## Prompt quality checklist

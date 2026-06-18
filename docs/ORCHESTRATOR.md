@@ -7,9 +7,9 @@ operator.
 
 ## Current bootstrap state
 
-This repository is not initialized as a Go/Kubebuilder project yet. At the time
-of this document, the repo contains planning docs but no `go.mod`, `cmd/`,
-`api/`, `internal/`, `config/`, or `.orchestrator/config.yaml`.
+This repository is in a pre-skeleton Go state. It has `go.mod` and planning
+docs, but it does not yet have Kubebuilder-generated `cmd/`, `api/`,
+`internal/`, `config/`, `PROJECT`, or `.orchestrator/config.yaml` files.
 
 That means there are two valid execution modes:
 
@@ -41,11 +41,13 @@ Still needed for the operator workflow:
 
 ## Recommended sequence
 
-From `/Users/bhshin/projects/kube-sentinel`:
+From the repository root:
 
 ```bash
-kubebuilder init --domain kube-sentinel.io --repo github.com/bhshin/kube-sentinel
-kubebuilder create api --group security --version v1alpha1 --kind SecurityAgent --namespaced=false
+kubebuilder init --domain kube-sentinel.io --repo github.com/bocopile/kube-sentinel
+kubebuilder create api --group security --version v1alpha1 --kind ClusterTarget --namespaced=false
+kubebuilder create api --group security --version v1alpha1 --kind SecurityAssessment --namespaced=false
+kubebuilder create api --group security --version v1alpha1 --kind ScanRun --namespaced=false
 go test ./...
 go build ./...
 orchestrator init --project . --yes
@@ -75,8 +77,8 @@ Good:
 
 ```text
 Implement M2 operator core from docs/ROADMAP.md: CRD type, registry, desired
-state store, override hook, SSA apply skeleton, and tests. Do not implement
-Falco yet.
+state store, target kubeconfig loader, remote apply skeleton, override hook,
+SSA apply skeleton, and tests. Do not implement runtime sensors yet.
 ```
 
 Avoid:
@@ -98,13 +100,10 @@ Cluster stages should add explicit manual checks in the milestone request, for
 example:
 
 ```bash
-kubectl get securityagent -A
+kubectl get clustertarget,securityassessment,scanrun -A
 kubectl get ds,deploy,cm -n kube-sentinel-system
 kubectl logs -n kube-sentinel-system deploy/kube-sentinel-controller-manager
 ```
 
-Elasticsearch stages should include concrete query checks against:
-
-- `security-events`
-- `security-inventory`
-- `security-vuln`
+LGTM stages should include concrete checks against Loki streams, Mimir counters,
+Tempo traces where applicable, and Grafana dashboard screenshots.
