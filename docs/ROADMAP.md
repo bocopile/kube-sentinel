@@ -21,13 +21,13 @@ test 가능한 상태여야 한다.
 | --- | --- | ---: | --- |
 | M0 | Assessment readiness check | 1일 | Mgmt namespace, Biz Cluster kubeconfig Secret, target preflight, bootstrap policy, read-only RBAC, image access, report store write test 통과 |
 | M0.5 | Delivery artifact security assessment runner baseline | 2-3일 | required artifact, artifact input manifest, scanner version, vulnerability DB baseline, image access, digest list, SAST/Secret/Image/SBOM/Integrity/Manifest/RBAC/Dockerfile/Script raw report, minimal normalized finding, scan health file 검증 |
-| M1 | Report store와 dashboard backend | 2일 | M0.5 report fixture를 report artifact, stable ID가 있는 normalized finding, metadata index, Artifact Store backend plugin, scan health, final decision record, evidence bundle, 기본 dashboard retrieval view로 적재 |
+| M1 | Report store와 dashboard/API backend | 2일 | M0.5 report fixture를 report artifact, stable ID가 있는 normalized finding, metadata index, Artifact Store backend plugin, scan health, final decision record, evidence bundle, authenticated dashboard retrieval API로 적재 |
 | M2 | Mgmt operator core + Feature orchestrator scaffold | 3-4일 | ClusterTarget/SecurityAssessment/ScanRun CRD, feature registry, feature orchestrator, desired state store, remote apply, bootstrap policy, SSA, finalizer, report writer, assessment scaffold 동작 |
 | M3 | Security Assessment feature integration | 1-2일 | controller-managed assessment Job/CronJob이 M0.5 scanner runner/report convention을 사용하고 scan health를 포함한 normalized finding을 Report Store로 연결 |
 | M4 | Applied cluster configuration scan | 2일 | read-only cluster inspection이 Workload, RBAC, ServiceAccount, Secret reference 위험을 보고 |
 | M5 | Trivy feature + image integrity integration | 2일 | M0.5 delivery image CVE/SBOM/digest report 경로를 controller feature로 통합하고 optional Trivy Operator `VulnerabilityReport` 입력이 중복 finding ID 없이 정규화 |
 | M6 | Optional telemetry/inventory extension | 선택 | Phase 2 전용. OTel/LGTM/OSQuery/runtime telemetry는 별도 설계 검토 후 도입 |
-| M7 | Final-check dashboard | 2-3일 | Overview, Targets, Assessments, Findings, Reports, Governance 메뉴 캡처 |
+| M7 | Final-check dashboard | 2-3일 | login/session guard, role별 action visibility, Overview, Targets, Assessments, Findings, Reports, Governance 메뉴 캡처 |
 | M8 | Final-check validation | 1일 | delivery artifact scan, applied cluster configuration scan, report generation, Secret redaction, exception status, evidence bundle, no-auto-remediation guardrail end-to-end 검증 |
 
 ## 첫 구현 블록

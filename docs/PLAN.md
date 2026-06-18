@@ -678,13 +678,13 @@ kube-sentinel/
 |---------|------|:---:|--------------|
 | **M0** | Assessment readiness checks | 1일 | Mgmt namespace, kubeconfig Secret, target namespace, read-only RBAC, image access, report store write 확인 |
 | **M0.5** | 납품 산출물 보안 점검 runner 베이스라인 | 2~3일 | artifact input manifest, scanner baseline, SAST/Secret/Image/SBOM/무결성/Manifest/RBAC/Dockerfile/Script raw report, minimal normalized finding, scan health file 생성 |
-| **M1** | Report Store + Dashboard backend | 2일 | M0.5 report fixture를 raw report, normalized finding, scan health, final decision, evidence bundle, 기본 dashboard 조회 모델로 적재 |
+| **M1** | Report Store + Dashboard/API backend | 2일 | M0.5 report fixture를 raw report, normalized finding, scan health, final decision, evidence bundle, authenticated dashboard 조회 API 모델로 적재 |
 | **M2** | Mgmt Controller Core + Security Assessment Scaffold | 3~4일 | CRD, registry, desired state store, remote apply, SSA, finalizer, report writer, assessment scaffold 동작 |
 | **M3** | Security Assessment Feature 통합 | 1~2일 | controller-managed assessment Job/CronJob이 M0.5 scanner runner/report convention을 사용하고 scan health를 포함한 normalized finding을 Report Store로 연결 |
 | **M4** | Applied Cluster Configuration Scan | 2일 | Biz Cluster read-only 조회로 Workload/RBAC/Secret 참조 finding 생성 |
 | **M5** | Trivy Feature + 이미지/SBOM/무결성 통합 | 2일 | M0.5 image/SBOM/digest report 경로를 controller feature로 통합하고 optional VulnerabilityReport 입력을 중복 finding ID 없이 정규화 |
 | **M6** | Optional Inventory/Telemetry Extension | 선택 | OSQuery, OTel/LGTM, runtime telemetry는 별도 설계 승인 후 진행 |
-| **M7** | Final Check Dashboard | 2~3일 | Overview, Targets, Assessments, Findings, Reports, Governance 메뉴 조회 |
+| **M7** | Final Check Dashboard | 2~3일 | login/session guard, 역할별 action visibility, Overview, Targets, Assessments, Findings, Reports, Governance 메뉴 조회 |
 | **M8** | Final-check validation | 1일 | 최종 보고서, Secret redaction, exception status, evidence bundle, no-auto-remediation guardrail 확인 |
 
 **총 예상 기간: 4주 내외 (18~20 working days, parser/권한 이슈 발생 시 추가 버퍼)**

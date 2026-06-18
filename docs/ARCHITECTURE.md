@@ -23,6 +23,7 @@ Mgmt Cluster의 주요 구성:
   - Feature orchestrator
   - Feature plugin registry
 - Dashboard / API
+- Authn/Authz middleware
 - Metadata DB
 - Artifact Store abstraction
 
@@ -399,7 +400,8 @@ spec:
 | Report store | Stores raw reports, normalized findings, scan health, final decisions, and evidence bundles. |
 | Report metadata store | Stores queryable ScanRun, Finding, FinalDecision, ExceptionReview, and artifact index records for dashboard/API retrieval. |
 | Report artifact store | Stores raw scanner reports, SBOMs, digest reports, normalized finding files, exported reports, and evidence bundles. |
-| Assessment API | Reads report metadata and artifact references for dashboard, report download, and review workflows. |
+| Authn/Authz middleware | Handles login/session or token validation and maps users to viewer, operator, and approver actions. |
+| Assessment API | Authenticated API for dashboard queries, report download, scan execution requests, and exception review workflows. |
 | Dashboard model | Provides one Final Check Dashboard with Overview, Targets, Assessments, Findings, Reports, and Governance views. |
 
 ## Assessment reliability layer
@@ -644,6 +646,34 @@ tabs or filters inside the larger menu groups, not as top-level navigation.
 | Findings | `sast`, `secret`, `image_vulnerability`, `integrity`, `sbom`, `kubernetes`, `rbac`, `secret_ref`, `network`, `dockerfile`, `script` |
 | Reports | final-check report, raw reports, normalized findings, scan health summary, evidence bundle |
 | Governance | findings where `exception_required=true`, approved exceptions, expired exceptions, remediation tracking |
+
+## Dashboard/API backend and auth boundary
+
+Final Check Dashboard는 정적 report viewer가 아니라 authenticated API 뒤의
+read model을 조회하는 제품 화면으로 둔다. PoC에서는 simple local user store,
+OIDC, 또는 reverse proxy SSO 중 하나를 선택할 수 있지만, dashboard/API는
+인증되지 않은 사용자에게 target, finding, report artifact, kubeconfig metadata를
+노출하지 않는다.
+
+Required backend capabilities:
+
+| Capability | Minimum behavior |
+| --- | --- |
+| Authentication | Login session, bearer token, or trusted reverse proxy identity 중 하나를 검증한다. |
+| Authorization | `viewer`, `operator`, `approver`, `admin` 역할을 구분한다. |
+| Read API | `ClusterTarget`, `ScanRun`, finding, scan health, final decision, exception, report artifact metadata를 filter/page/sort로 조회한다. |
+| Artifact download | Raw report, SBOM, final report, evidence bundle download는 artifact reference를 검증한 뒤 backend가 제공한다. |
+| Scan action API | ScanRun 생성, retry/resume, profile 실행 요청은 `operator` 이상으로 제한한다. |
+| Exception workflow | 예외 승인/만료/반려는 `approver` 이상으로 제한하고 audit field를 남긴다. |
+
+Authorization rules:
+
+- `viewer`는 dashboard 조회와 report download만 수행한다.
+- `operator`는 scan 실행, retry/resume, target preflight를 요청할 수 있다.
+- `approver`는 exception review 상태를 변경할 수 있다.
+- `admin`은 user/role mapping, backend setting, retention policy를 관리한다.
+- 어떤 역할도 kubeconfig Secret value 또는 raw Secret value를 API 응답으로 받을
+  수 없다.
 
 ## Report store policy
 

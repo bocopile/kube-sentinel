@@ -57,6 +57,10 @@ Cluster를 등록하고, 납품 산출물 보안 평가를 실행하며, remote 
   exception candidate를 위한 Report Store와 Evidence Bundle 생성
 - immutable artifact, normalized JSONL/JSON document, metadata index, stable
   artifact reference, dashboard/API read model을 이용한 결과 저장 및 조회
+- 사용자 로그인, session/token 검증, 역할 기반 읽기/실행/예외 승인 권한을
+  처리하는 Dashboard/API backend
+- `ClusterTarget`, `ScanRun`, finding, scan health, final decision, report,
+  evidence bundle을 조회하는 read API와 artifact download API
 - Filesystem, S3-compatible, MinIO, SeaweedFS, NFS/PVC 등으로 교체 가능한
   Artifact Store backend plugin interface
 - source, secret, image, SBOM, integrity, Kubernetes manifest, RBAC,

@@ -30,7 +30,7 @@ orchestrator run --project . --request "<prompt>" --auto-approve
 | P0 | Foundation | First implementation block | Go management controller skeleton과 core API contract |
 | P1 | S0 | M0 | Assessment readiness check |
 | P2 | S0.5 | M0.5 | Delivery artifact security assessment runner baseline |
-| P3 | S1 | M1 | Report store, finding schema, evidence bundle, dashboard backend |
+| P3 | S1 | M1 | Report store, finding schema, evidence bundle, dashboard/API backend |
 | P4 | S2 | M2 | Mgmt operator core, Feature orchestrator, security assessment scaffold |
 | P5 | S2 | M3 | Security Assessment feature integration |
 | P6 | S3 | M4 | Applied cluster configuration scan |
@@ -175,7 +175,9 @@ docs/ROADMAP.md의 M1을 구현한다.
 - report, log, dashboard record, artifact 대상 Secret redaction guard.
 - evidence bundle export 구조.
 - Overview, Targets, Assessments, Findings, Reports, Governance를 위한 기본
-  dashboard/read-model record.
+  dashboard/API read-model record.
+- login/session 또는 bearer token 검증을 위한 auth middleware skeleton.
+- viewer/operator/approver/admin role에 따른 dashboard API authorization guard.
 
 이 milestone에서는 OTel/LGTM telemetry 또는 Grafana 전용 dashboard를 구현하지
 않는다.
@@ -191,6 +193,8 @@ docs/ROADMAP.md의 M1을 구현한다.
   exception candidate를 참조.
 - Secret 형태의 fixture 값은 저장 전에 redaction 또는 reject 처리.
 - Artifact Store backend 선택이 finding metadata schema를 변경하지 않음.
+- 인증되지 않은 request는 dashboard/API read model을 조회할 수 없음.
+- role이 부족한 request는 scan action 또는 exception approval API를 호출할 수 없음.
 ```
 
 ## P4 - M2 management controller core and assessment scaffold
@@ -355,19 +359,23 @@ docs/ROADMAP.md와 docs/FRONTEND_ARCHITECTURE.md의 M7을 구현한다.
 
 범위:
 
-- Overview, Targets, Assessments, Findings, Reports, Governance를 위한 Final
-  Check Dashboard asset.
+- login/session guard가 있는 Overview, Targets, Assessments, Findings, Reports,
+  Governance Final Check Dashboard asset.
 - Findings table 또는 문서화된 panel query convention.
 - final-check report, evidence bundle, raw report, normalized finding,
   scan health summary를 위한 Reports menu.
 - environment, target version/build, scan run ID, namespace, image, severity,
   category, scanner, scan status, exception status dashboard variable.
+- viewer/operator/approver/admin role별 action visibility.
 
 수용 기준:
 
 - Go package가 존재하면 go test ./... 통과.
 - Go package가 존재하면 go build ./... 통과.
 - Dashboard asset 또는 setup instruction이 deterministic.
+- 인증되지 않은 사용자는 dashboard data를 조회할 수 없음.
+- operator/approver 권한이 없는 사용자는 scan action 또는 exception action을 볼
+  수 없거나 실행할 수 없음.
 - screenshot 또는 문서화된 query가 각 menu를 포함.
 - Reports menu가 evidence bundle과 final decision data를 노출.
 ```

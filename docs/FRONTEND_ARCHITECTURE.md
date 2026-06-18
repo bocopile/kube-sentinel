@@ -23,8 +23,8 @@ Grafana/LGTM은 2차 telemetry export가 필요할 때 선택적으로 연동한
 
 | 단계 | UI 형태 | 목적 |
 |------|--------|------|
-| MVP | Report Store backed dashboard | 빠른 PoC 검증, finding 집계, 증적 조회, report export |
-| Product UI | React/Next.js 또는 동등한 SPA | 검사 실행, finding 상세, 예외 workflow, 최종 판정 관리 |
+| MVP | Authenticated Report Store backed dashboard | 빠른 PoC 검증, finding 집계, 증적 조회, report export |
+| Product UI | React/Next.js 또는 동등한 SPA + Assessment API | 검사 실행, finding 상세, 예외 workflow, 최종 판정 관리 |
 
 ## Information Architecture
 
@@ -144,8 +144,11 @@ Scanner / Cluster Inspector
 조회 흐름:
 
 ```text
-Dashboard
+User
+  -> Login / session validation
+  -> Dashboard
   -> assessment-api
+  -> authorization check
   -> PostgreSQL metadata query
   -> artifact reference lookup
   -> raw report / SBOM / evidence bundle download
@@ -155,6 +158,19 @@ Dashboard 목록, 필터, 집계는 metadata store에서 조회한다. 원본 sc
 report, SBOM, final report, evidence bundle은 artifact store의 stable path를
 참조해 다운로드한다. metadata store는 조회 최적화용이며, 필요 시 artifact
 store의 `manifest.json`과 normalized JSONL에서 재생성할 수 있어야 한다.
+
+로그인과 권한:
+
+| 역할 | 허용 작업 |
+|------|----------|
+| Viewer | Overview, Targets, Assessments, Findings, Reports, Governance 조회와 report/evidence download |
+| Operator | scan profile 실행, retry/resume, preflight 재실행 |
+| Approver | exception approval, rejection, expiry update |
+| Admin | user/role mapping, retention/backend setting 관리 |
+
+UI는 사용자 역할에 따라 action button을 숨기거나 비활성화한다. API도 같은
+권한을 서버에서 다시 검증해야 하며, UI/API 모두 kubeconfig Secret value와
+raw Secret value를 표시하지 않는다.
 
 ## Workflow View
 
@@ -176,7 +192,8 @@ Code / Artifact 실패와 Biz Cluster 실패를 같은 실패로 보지 않고, 
 
 | API | 역할 |
 |-----|------|
-| `assessment-api` | scan run, finding, exception, 최종 판정 결과 조회 |
+| `auth-api` 또는 외부 SSO middleware | login/session 검증과 user role resolution |
+| `assessment-api` | scan run, finding, exception, 최종 판정 결과 조회와 scan action 요청 |
 | `scanner-runner` | 검사 profile 실행 요청과 상태 추적 |
 | `artifact-store` | raw report, SBOM, normalized finding, dashboard snapshot 저장 |
 | `exception-store` | 예외 승인 이력, 만료일, 승인자, 사유 저장 |
@@ -201,3 +218,6 @@ Code / Artifact 실패와 Biz Cluster 실패를 같은 실패로 보지 않고, 
 - Source & Secrets, Images & Integrity, Kubernetes Config & RBAC, Dockerfile & Scripts는 top-level 메뉴가 아니라 Findings 또는 Assessments 내부 탭으로 제공한다.
 - 예외 승인은 finding을 숨기지 않는다. 상태만 `Approved`로 바꾸고 만료일을 표시한다.
 - 개선 권고와 remediation은 보고서/추적 정보로만 제공한다. 현재 버전 UI는 Biz Cluster 인프라 자동 수정 액션을 제공하지 않는다.
+- 인증되지 않은 사용자는 어떤 dashboard data도 조회할 수 없다.
+- 권한이 부족한 사용자는 scan 실행, retry/resume, exception approval action을
+  수행할 수 없다.
