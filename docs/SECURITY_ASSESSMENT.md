@@ -52,14 +52,124 @@
 
 사용자는 카테고리별로 관련 검사를 한 번에 실행할 수 있어야 한다.
 
-| 프로파일 | 포함 검사 | 대표 산출물 |
-|----------|----------|------------|
-| Source Security Scan | SonarQube, Semgrep, gosec, Gitleaks | SAST report, secret report |
-| Image Supply Chain Scan | Trivy/Grype, Syft, Cosign/Notation, Crane | CVE report, SBOM, digest/signature verification |
-| Kubernetes Config Scan | Helm render, kube-linter, conftest, applied YAML inspection | Kubernetes policy report |
-| RBAC & Secret Reference Scan | RBAC manifest scan, applied RBAC inspection, ServiceAccount/Secret reference inspection | RBAC risk report, secret reference report |
-| Build & Deploy Scan | Hadolint, ShellCheck, deploy script inspection | Dockerfile/script report |
-| Full Final Check | 위 모든 profile 실행 후 최종 판정 요약 생성 | final-check summary, normalized findings, exception candidates |
+검사 절차는 권한 모델과 실패 원인이 다르므로 `Code / Artifact Scan`과
+`Biz Cluster Scan`으로 분리한다.
+
+| 검사 그룹 | 목적 | 실행 위치 | 대표 산출물 |
+|----------|------|----------|------------|
+| Code / Artifact Scan | 납품 산출물 자체의 보안 위험 확인 | Mgmt Cluster Job, 별도 runner, CI runner, 검수 VM | SAST report, secret report, image CVE/SBOM/digest report, manifest/RBAC/Dockerfile/script report |
+| Biz Cluster Scan | Biz Cluster에 실제 적용된 설정과 권한 상태 확인 | Mgmt Controller의 read-only 조회 또는 허용된 scanner Job remote apply | applied config report, RBAC risk report, Secret reference report, cluster scan health |
+| Full Final Check | 두 검사 그룹을 순차 실행하고 최종 판정 생성 | Mgmt Cluster `ScanRun` | final-check summary, normalized findings, exception candidates |
+
+Code / Artifact Scan 프로파일:
+
+| 프로파일 | 포함 검사 | 결과 메뉴 |
+|----------|----------|----------|
+| Source Security Scan | SonarQube, Semgrep, gosec, Gitleaks | Source & Secrets |
+| Image Supply Chain Scan | Trivy/Grype, Syft, Cosign/Notation, Crane | Images & Integrity |
+| Manifest & RBAC Manifest Scan | Helm render, kube-linter, conftest, RBAC manifest policy | Kubernetes Config & RBAC |
+| Build & Deploy Scan | Hadolint, ShellCheck, deploy script inspection | Dockerfile & Scripts |
+
+Biz Cluster Scan 프로파일:
+
+| 프로파일 | 포함 검사 | 결과 메뉴 |
+|----------|----------|----------|
+| Applied Workload Config Scan | Pod/Deployment/DaemonSet/StatefulSet spec inspection | Kubernetes Config & RBAC |
+| Applied RBAC Scan | Role, RoleBinding, ClusterRole, ClusterRoleBinding inspection | Kubernetes Config & RBAC |
+| Secret Reference Scan | env/envFrom/volume Secret reference, ServiceAccount token automount inspection | Source & Secrets, Kubernetes Config & RBAC |
+| Exposure Scan | Service/Ingress external exposure inspection | Kubernetes Config & RBAC |
+
+`Full Final Check`는 Code / Artifact Scan을 먼저 실행하고, 산출물 누락이나
+scanner 실행 실패를 `scan_health=Fail`로 기록한 뒤 Biz Cluster Scan으로
+진행한다. Biz Cluster 접속 실패, RBAC denied, namespace allowlist 위반은
+Code / Artifact Scan 결과와 분리된 cluster scan health로 기록한다.
+
+## Assessment Workflows
+
+워크플로우 문서는 검사 그룹별로 분리한다. 하나의 `Full Final Check`는 두
+워크플로우를 순차 실행하지만, 각 워크플로우는 독립 실행, 재실행, 실패
+분석이 가능해야 한다.
+
+### Code / Artifact Workflow
+
+목적은 Biz Cluster 접근 없이 납품 산출물 자체의 위험을 판단하는 것이다.
+
+```text
+1. 산출물 입력 검증
+   - source, Dockerfile, Helm/YAML, RBAC manifest, script 존재 확인
+   - image list, approved digest list, registry credential 확인
+2. scanner 기준선 확인
+   - scanner version
+   - vulnerability DB/rule 기준일
+   - policy bundle version
+3. source/secret scan 실행
+4. image/SBOM/digest/signature scan 실행
+5. manifest/RBAC/Dockerfile/script scan 실행
+6. raw report 저장
+7. finding 정규화
+8. `ScanRun.status.artifactScan` 갱신
+```
+
+실패 기준:
+
+- 필수 산출물 누락
+- scanner 실행 실패
+- 취약점 DB 또는 rule 기준일 미확인
+- registry pull/digest 조회 실패
+- Critical finding, Secret 노출, digest mismatch, 서명 검증 실패
+
+### Biz Cluster Workflow
+
+목적은 Biz Cluster에 실제 적용된 설정과 권한 상태를 확인하는 것이다.
+
+```text
+1. ClusterTarget 조회
+2. kubeconfig Secret 참조 확인
+3. Biz Cluster preflight
+   - API server 연결 확인
+   - namespace allowlist 확인
+   - read-only RBAC 확인
+   - optional CRD/bootstrap capability 확인
+4. applied workload spec 조회
+5. applied RBAC/ServiceAccount 조회
+6. Secret reference, ServiceAccount token automount, Service/Ingress 조회
+7. 필요 시 허용된 scanner Job remote apply
+8. raw inspection report 저장
+9. finding 정규화
+10. `ClusterTarget.status`와 `ScanRun.status.clusterScan` 갱신
+```
+
+실패 기준:
+
+- kubeconfig Secret 누락 또는 인증 실패
+- API server unreachable
+- namespace allowlist 위반
+- read-only RBAC denied
+- Secret raw data 조회 시도
+- 승인되지 않은 privileged/hostPath/hostNetwork/RBAC wildcard/cluster-admin
+
+### Full Final Check Workflow
+
+```text
+1. ScanRun 생성
+2. Code / Artifact Scan 실행
+3. Biz Cluster preflight
+   - kubeconfig Secret 참조 확인
+   - API server 연결 확인
+   - namespace allowlist 확인
+   - read-only RBAC 확인
+   - optional CRD/bootstrap capability 확인
+4. Biz Cluster Scan 실행
+   - applied workload/RBAC/ServiceAccount/Secret reference 조회
+   - 필요 시 허용된 scanner Job remote apply
+5. finding 정규화
+6. Code 결과와 Biz Cluster 결과 상관 분석
+7. 최종 판정과 예외 검토 항목 생성
+```
+
+`Full Final Check`는 Code / Artifact Workflow 실패를 Biz Cluster Workflow
+결과로 덮어쓰지 않는다. 두 워크플로우의 실패 원인은 `artifactScan`,
+`clusterScan`, `scan_health`에서 각각 확인되어야 한다.
 
 ## Required Inputs
 

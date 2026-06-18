@@ -45,6 +45,7 @@ remote apply/read-only access, and publish results to Grafana LGTM.
 - Grafana LGTM routing for events, inventory, vulnerabilities, and normalized security findings.
 - Delivery artifact security assessment for source, secret, image, SBOM, integrity, Kubernetes manifest, RBAC, Dockerfile, and script risks.
 - Applied cluster configuration assessment for Pod security settings, RBAC, Secret references, ServiceAccount token behavior, and Service/Ingress exposure.
+- Separate scan phases for Code / Artifact Scan and Biz Cluster Scan so artifact failures, cluster connectivity failures, RBAC denied errors, and skipped cluster scans are not conflated.
 - Scan health reporting for scanner errors, unsupported targets, missing required artifacts, and stale vulnerability databases or policy rules.
 - Exception and remediation tracking for findings that require approval before delivery.
 - Final Check Dashboard assets.

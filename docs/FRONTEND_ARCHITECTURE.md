@@ -9,6 +9,7 @@
 사용자는 다음 작업을 수행할 수 있어야 한다.
 
 - 검사 프로파일을 선택해 관련 검사를 한 번에 실행한다.
+- Code / Artifact Scan과 Biz Cluster Scan의 실행 상태와 실패 원인을 분리해서 확인한다.
 - 전체 finding을 severity, category, target, scanner, exception 상태로 필터링한다.
 - 각 카테고리별 상세 결과와 증적을 확인한다.
 - 최종 판정 실패 원인을 확인한다.
@@ -33,6 +34,8 @@ Final Check Dashboard
 ├── Clusters
 ├── Run Scan
 ├── Findings
+├── Code / Artifacts
+├── Biz Cluster
 ├── Source & Secrets
 ├── Images & Integrity
 ├── Kubernetes Config & RBAC
@@ -47,8 +50,10 @@ Final Check Dashboard
 |------|------|----------|
 | Overview | 납품 가능 여부 요약 | Pass/Fail, Critical/High, failed scans, missing artifacts, exception-required count |
 | Clusters | Biz Cluster 등록 상태 확인 | ClusterTarget list, connection phase, capability status, namespace allowlist, last validation time |
-| Run Scan | 카테고리별 검사 실행 | Source Security, Image Supply Chain, Kubernetes Config, RBAC & Secret Reference, Build & Deploy, Full Final Check |
+| Run Scan | 검사 그룹별 실행 | Code / Artifact Scan, Biz Cluster Scan, Full Final Check, preflight status |
 | Findings | 전체 finding 통합 목록 | severity/category/scanner/target/status 필터, finding 상세 drawer |
+| Code / Artifacts | 납품 산출물 검사 결과 | source, image, SBOM, digest, manifest, Dockerfile, script scan status |
+| Biz Cluster | Biz Cluster 적용 상태 검사 결과 | applied workload, RBAC, ServiceAccount, Secret reference, Service/Ingress scan status |
 | Source & Secrets | 코드와 민감정보 위험 분석 | SonarQube/Semgrep/gosec/Gitleaks 결과, 파일 위치, rule, remediation |
 | Images & Integrity | 이미지와 공급망 위험 분석 | CVE, SBOM, digest mismatch, signature verification, base image risk |
 | Kubernetes Config & RBAC | YAML, applied config, 권한 분석 | privileged, hostPath, hostNetwork, Secret references, RBAC wildcard, cluster-admin |
@@ -58,16 +63,25 @@ Final Check Dashboard
 
 ## Scan Profiles
 
-`Run Scan` 메뉴는 도구명이 아니라 검사 영역 기준으로 실행 버튼을 제공한다.
+`Run Scan` 메뉴는 도구명이 아니라 검사 그룹과 검사 영역 기준으로 실행 버튼을
+제공한다.
 
-| 프로파일 | 실행 도구 | 결과 메뉴 |
-|----------|----------|----------|
-| Source Security Scan | SonarQube, Semgrep, gosec, Gitleaks | Source & Secrets |
-| Image Supply Chain Scan | Trivy/Grype, Syft, Cosign/Notation, Crane | Images & Integrity |
-| Kubernetes Config Scan | Helm render, kube-linter, conftest, applied YAML inspection | Kubernetes Config & RBAC |
-| RBAC & Secret Reference Scan | conftest/rbac policy, applied RBAC, ServiceAccount, Secret reference inspection | Kubernetes Config & RBAC |
-| Build & Deploy Scan | Hadolint, ShellCheck | Dockerfile & Scripts |
-| Full Final Check | 모든 프로파일 실행 후 최종 판정 요약 생성 | Overview, Findings, Scan Health, Exceptions & Remediation |
+| 검사 그룹 | 프로파일 | 실행 도구/방식 | 결과 메뉴 |
+|----------|----------|---------------|----------|
+| Code / Artifact Scan | Source Security Scan | SonarQube, Semgrep, gosec, Gitleaks | Code / Artifacts, Source & Secrets |
+| Code / Artifact Scan | Image Supply Chain Scan | Trivy/Grype, Syft, Cosign/Notation, Crane | Code / Artifacts, Images & Integrity |
+| Code / Artifact Scan | Manifest & RBAC Manifest Scan | Helm render, kube-linter, conftest, RBAC manifest policy | Code / Artifacts, Kubernetes Config & RBAC |
+| Code / Artifact Scan | Build & Deploy Scan | Hadolint, ShellCheck | Code / Artifacts, Dockerfile & Scripts |
+| Biz Cluster Scan | Applied Workload Config Scan | read-only applied workload inspection | Biz Cluster, Kubernetes Config & RBAC |
+| Biz Cluster Scan | Applied RBAC Scan | read-only applied RBAC inspection | Biz Cluster, Kubernetes Config & RBAC |
+| Biz Cluster Scan | Secret Reference Scan | env/envFrom/volume/ServiceAccount token reference inspection | Biz Cluster, Source & Secrets |
+| Biz Cluster Scan | Exposure Scan | Service/Ingress exposure inspection | Biz Cluster, Kubernetes Config & RBAC |
+| Full Final Check | Full Final Check | Code / Artifact Scan 이후 Biz Cluster preflight와 Biz Cluster Scan 실행 | Overview, Findings, Scan Health, Exceptions & Remediation |
+
+Biz Cluster Scan 실행 버튼은 선택한 `ClusterTarget`이 `Ready`가 아니면
+비활성화한다. 비활성 사유는 kubeconfig Secret 누락, API 연결 실패, RBAC
+denied, namespace allowlist 미설정, optional CRD/bootstrap capability 부족 중
+하나로 표시한다.
 
 ## Common Filters
 
@@ -78,6 +92,7 @@ Final Check Dashboard
 | Environment | `dev`, `final-check` |
 | Target version/build | 납품 대상 버전 또는 build ID |
 | Scan run ID | 검사 실행 단위 |
+| Scan group | Code / Artifact, Biz Cluster, Full Final Check |
 | Namespace | Biz Cluster 적용 설정 검수 범위 |
 | Image | 이미지 repository, tag, digest |
 | Severity | Critical, High, Medium, Low, Info |
@@ -135,6 +150,22 @@ Scanner / Cluster Inspector
   -> Final Check Dashboard
 ```
 
+## Workflow View
+
+`Run Scan`과 `Overview`는 검사 결과를 도구별이 아니라 workflow별로 먼저
+보여준다.
+
+| Workflow | UI 상태 | 대표 실패 원인 | 재실행 단위 |
+|----------|---------|----------------|-------------|
+| Code / Artifact Workflow | `artifactScan.phase` | missing artifact, scanner error, stale DB/rule, registry pull failure, digest mismatch | Code / Artifact Scan만 재실행 |
+| Biz Cluster Workflow | `clusterScan.phase` | kubeconfig missing, API unreachable, RBAC denied, namespace allowlist violation, optional CRD/bootstrap unavailable | Biz Cluster Scan만 재실행 |
+| Final Decision Workflow | `finalDecision.status` | Critical finding, Secret exposure, unapproved exception, expired exception | 전체 또는 실패 workflow 재실행 후 재판정 |
+
+워크플로우 상세 화면은 같은 `ScanRun` 안에서 단계별 timestamps,
+conditions, raw report 링크, normalized finding 링크를 보여준다. 사용자는
+Code / Artifact 실패와 Biz Cluster 실패를 같은 실패로 보지 않고, 어느
+절차를 다시 실행해야 하는지 즉시 판단할 수 있어야 한다.
+
 제품형 UI로 확장할 때는 다음 API 계층을 둔다.
 
 | API | 역할 |
@@ -149,6 +180,7 @@ Scanner / Cluster Inspector
 | 객체 | 설명 |
 |------|------|
 | ScanRun | 한 번의 검사 실행 단위. profile, target version, status, timestamps를 가진다. |
+| ScanPhase | `artifactScan`, `clusterScan` 등 검사 절차별 phase, timestamps, conditions를 가진다. |
 | Finding | normalized finding. category, scanner, target, severity, status를 가진다. |
 | FinalDecision | scan run별 최종 Pass/Fail/Warning 판정과 주요 실패 원인 목록. |
 | ExceptionReview | finding별 예외 승인 상태, 승인자, 사유, 만료일. |

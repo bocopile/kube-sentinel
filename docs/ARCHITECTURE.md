@@ -508,6 +508,8 @@ separately.
 
 - `status.observedGeneration`
 - `status.phase`: `Pending`, `Running`, `Completed`, `Failed`, or `Canceled`
+- `status.artifactScan`: Code / Artifact Scan phase, timestamps, and conditions
+- `status.clusterScan`: Biz Cluster Scan phase, timestamps, and conditions
 - `status.features[]`
 - `status.targets[]`
 - `status.remoteResources[]`
