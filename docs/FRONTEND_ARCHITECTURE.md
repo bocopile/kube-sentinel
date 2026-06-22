@@ -86,7 +86,7 @@ denied, namespace allowlist 미설정, optional CRD/bootstrap capability 부족 
 | Namespace | Biz Cluster 적용 설정 검수 범위 |
 | Image | 이미지 repository, tag, digest |
 | Severity | Critical, High, Medium, Low, Info |
-| Category | `sast`, `secret`, `image_vulnerability`, `sbom`, `integrity`, `kubernetes`, `rbac`, `dockerfile`, `script`, `scan_health` |
+| Category | `sast`, `secret`, `image_vulnerability`, `sbom`, `integrity`, `kubernetes`, `rbac`, `secret_ref`, `network`, `dockerfile`, `script`, `scan_health` |
 | Scanner | SonarQube, Semgrep, gosec, Gitleaks, Trivy, Grype, Syft, Cosign, kube-linter, conftest, Hadolint, ShellCheck |
 | Scan status | Pass, Fail, Error, Skipped, Unsupported |
 | Exception status | None, Required, Requested, Approved, Expired, Rejected |
@@ -201,3 +201,4 @@ Code / Artifact 실패와 Biz Cluster 실패를 같은 실패로 보지 않고, 
 - Source & Secrets, Images & Integrity, Kubernetes Config & RBAC, Dockerfile & Scripts는 top-level 메뉴가 아니라 Findings 또는 Assessments 내부 탭으로 제공한다.
 - 예외 승인은 finding을 숨기지 않는다. 상태만 `Approved`로 바꾸고 만료일을 표시한다.
 - 개선 권고와 remediation은 보고서/추적 정보로만 제공한다. 현재 버전 UI는 Biz Cluster 인프라 자동 수정 액션을 제공하지 않는다.
+- AI remediation advisor(선택)가 생성한 조치 가이드는 "AI generated / advisory / non-binding" 라벨과 provenance(model, 생성 시각)와 함께 표시하고, 정적 remediation과 구분한다. AI 가이드에도 자동 수정 액션은 제공하지 않는다. 상세는 [AI_REMEDIATION.md](./AI_REMEDIATION.md).

@@ -38,6 +38,7 @@ orchestrator run --project . --request "<prompt>" --auto-approve
 | P8 | S5 | M6 | Phase 2 optional inventory/telemetry extension |
 | P9 | S4 | M7 | Final Check Dashboard |
 | P10 | S4 | M8 | Final-check validation, report, exception, garbage collection |
+| P11 | S4 | M9 | (선택) AI remediation advisor — Gemini advisory sidecar, redaction, provenance |
 
 ## 공통 지시 블록
 
@@ -375,6 +376,34 @@ docs/ROADMAP.md의 M8을 구현한다.
 - stale resource cleanup behavior가 문서화됨.
 - final-check report output이 scan health, evidence bundle reference, exception
   status, 자동 Biz Cluster infrastructure mutation 없음 정보를 포함.
+```
+
+## P11 - M9 AI remediation advisor (선택)
+
+```text
+docs/AI_REMEDIATION.md와 docs/ROADMAP.md의 M9를 구현한다. 1차 선택 기능이며 기본 OFF다.
+
+범위:
+
+- SecurityAssessment.spec.aiRemediation opt-in config와 validation.
+- final decision 확정 이후 동작하는 remediation_enrichment feature (priority ~250).
+- egress 전 field allowlist + Secret redaction guard 재사용. secret/sast/script 제외,
+  Critical/High + kubernetes/rbac/dockerfile/image_vulnerability + per-scan cap 50.
+- 공개 Gemini API provider 구현과 RemediationAdvisorProvider interface.
+- security.aiRemediation/v1 출력 schema 검증과 거부 시 static fallback.
+- remediation-advisory.jsonl sidecar와 provenance 기록. core findings.jsonl 불변.
+- API/timeout/validation 실패 시 scan non-Fail, scan_health degraded.
+
+automatic remediation, severity/판정 변경, secret/sast/script 입력, Vertex AI,
+core remediation 덮어쓰기는 구현하지 않는다.
+
+수용 기준:
+
+- go test ./... 통과, go build ./... 통과.
+- Secret fixture 입력 시 Gemini request body에 원문 미포함.
+- AI ON/OFF 동일 scan에서 finding count, severity, final decision 동일.
+- Gemini 실패 fixture에서 scan Completed + scan_health degraded.
+- evidence bundle에 sidecar와 provenance 포함.
 ```
 
 ## 프롬프트 품질 체크리스트

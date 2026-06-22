@@ -211,6 +211,9 @@ Version governance:
 - A scan with missing tool version or DB/rule baseline must produce
   `scan_health=Fail` or `scan_health=Warning` according to the final-check
   policy.
+- AI remediation advisor가 활성화되면 model id/version과 prompt template hash를
+  scanner version과 동급으로 기록한다. model version 미기록 scan은
+  `scan_health=Warning`으로 처리한다. 상세는 [AI_REMEDIATION.md](./AI_REMEDIATION.md).
 
 ## Target prerequisites
 
@@ -366,6 +369,12 @@ spec:
     readOnlyInspection: true
     trivyOperatorReports: false
     hostPath: false
+  bootstrapPolicy:
+    installMissingNamespace: false
+    installManagedRBAC: true
+    installScannerResources: true
+    attachImagePullSecretRef:
+      name: scanner-pull-secret
 ---
 apiVersion: security.kube-sentinel.io/v1alpha1
 kind: SecurityAssessment
@@ -486,6 +495,7 @@ Feature별 책임:
 | `rbac_review` | RBAC 과권한, wildcard, cluster-admin binding 검사 |
 | `secret_reference` | Secret raw value 없이 env/envFrom/volume/ServiceAccount token reference 검사 |
 | `trivy_operator_reports` | 기존 Trivy Operator `VulnerabilityReport` 선택 read-only 수집 |
+| `remediation_enrichment` | (선택, 기본 OFF) final decision 확정 후 AI 조치 가이드 advisory 생성. 상세는 [AI_REMEDIATION.md](./AI_REMEDIATION.md) |
 | `report_export` | final report와 evidence bundle 생성 |
 
 Priority 기본값:
@@ -498,7 +508,14 @@ Priority 기본값:
 | 100 | `image_vulnerability`, `image_integrity`, `sbom` | image digest 기준 CVE/SBOM/무결성 finding 생성 |
 | 150 | `kubernetes_manifest`, `rbac_review` | 납품 manifest/RBAC 정책 점검 |
 | 200 | `applied_cluster_config`, `secret_reference`, `trivy_operator_reports` | Biz Cluster 적용 상태와 선택 입력 정규화 |
+| 250 | `remediation_enrichment` | final decision 확정 후 AI 조치 가이드 생성 (선택, 기본 OFF) |
 | 300 | `report_export` | 모든 finding과 scan health를 종합해 report/evidence 생성 |
+
+`SecurityAssessment.spec.features[].name`은 사용자 노출 feature 명칭이며 내부 registry
+feature ID로 확장된다. 예: `trivy`는 `image_vulnerability`, `image_integrity`, `sbom`,
+`trivy_operator_reports`로, `security_assessment`는 source/secret/manifest/rbac/applied
+계열 feature로 매핑된다. umbrella 명칭과 registry feature ID 어디에도 없는 이름은
+ConfigError로 처리한다.
 
 ## Reconcile flow
 
@@ -521,7 +538,9 @@ Priority 기본값:
 16. queryable ScanRun, Finding, ScanHealth, FinalDecision, ExceptionReview,
     artifact index row를 Report Metadata Store에 upsert한다.
 17. disabled/stale remote resource를 label 기반으로 GC한다.
-18. `ClusterTarget.status`와 `ScanRun.status`를 갱신한다.
+18. Code / Artifact Scan과 Biz Cluster Scan 결과를 상관 분석한다.
+19. Evidence Bundle과 Exception Review 후보를 생성한다.
+20. `ClusterTarget.status`와 `ScanRun.status`를 갱신한다.
 
 Reconciler는 scanner별 세부 구현을 알지 않는다. 새 scanner 또는 저장소 backend는
 Feature plugin 또는 Artifact Store backend plugin으로 추가하며, Reconciler의
@@ -731,6 +750,8 @@ reports/
       exceptions/exception-review.yaml
       exports/final-report.md
       evidence/evidence-bundle.tar.gz
+      normalized/remediation-advisory.jsonl   # AI advisor opt-in 시
+      normalized/remediation-provenance.json  # AI advisor opt-in 시
 ```
 
 Retrieval rule:

@@ -61,6 +61,7 @@ Biz Cluster에는 kube-sentinel operator를 실행하지 않으며 kube-sentinel
 7. [docs/ROADMAP.md](docs/ROADMAP.md)
 8. [docs/ORCHESTRATOR.md](docs/ORCHESTRATOR.md)
 9. [docs/PROMPTS.md](docs/PROMPTS.md)
+10. [docs/AI_REMEDIATION.md](docs/AI_REMEDIATION.md)
 
 문서 정책:
 

@@ -32,6 +32,11 @@ Cluster를 등록하고, 납품 산출물 보안 평가를 실행하며, remote 
 | G17 | Mgmt Cluster 단일 operator가 Feature-as-Plugin registry를 통해 검사 기능을 오케스트레이션한다. | Reconciler 변경 없이 feature enable/disable, priority ordering, status reporting 확인 |
 | G18 | Biz Cluster Scan 전 preflight가 누락된 bootstrap 항목을 식별하고, 정책상 허용된 항목만 설치한다. | namespace/RBAC/image pull/report upload/optional CRD check 결과와 bootstrap audit 확인 |
 | G19 | Artifact Store는 backend plugin으로 교체 가능하며 S3/MinIO에 고정되지 않는다. | Filesystem 또는 SeaweedFS/S3-compatible backend 설정 전환 후 report artifact 조회 확인 |
+| G20 | AI remediation advisor는 기본 OFF opt-in이며, ON 시 advisory sidecar, provenance, redaction, `scan_health` degraded 기록을 제공한다. AI 실패는 scan Fail이 아니다. | AI ON/OFF scan에서 sidecar/provenance 생성, redaction fixture, Gemini 실패 시 scan Completed 확인 ([AI_REMEDIATION.md](./AI_REMEDIATION.md)) |
+| G21 | AI ON/OFF 동일 scan에서 finding count, severity, final decision이 동일하다(판정 비개입). | AI ON/OFF A/B 결과 비교 |
+
+G1~G19는 1차 필수 성공 기준이다. G20/G21은 AI remediation advisor opt-in 시에만
+적용하는 1차 선택 기준이며, 상세는 [AI_REMEDIATION.md](./AI_REMEDIATION.md)를 따른다.
 
 ## 비목표
 

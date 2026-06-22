@@ -35,3 +35,9 @@ go.work.sum
 .orchestrator/
 .idea/
 .claude/
+
+# pptx — 양식/산출물 바이너리 (sample.pptx는 C 단계에서 tools/pptx/template/로 이동 예정)
+*.pptx
+!tools/pptx/template/sample.pptx
+tools/pptx/output/
+tools/pptx/preview/

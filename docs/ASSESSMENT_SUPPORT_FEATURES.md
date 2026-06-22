@@ -42,6 +42,7 @@
 | Read-only RBAC manifest generator | Biz Cluster별 최소 권한 ServiceAccount/Role/ClusterRole 예시를 제공한다. | 자동 적용이 아니라 bootstrap 템플릿 생성으로 제한 |
 | Trivy Operator VulnerabilityReport ingestion | Biz Cluster에 Trivy Operator가 이미 설치되어 있으면 `VulnerabilityReport`를 read-only로 보조 입력으로 사용한다. | CRD 존재와 get/list/watch 권한이 확인된 경우만 사용 |
 | Report format export | 사람이 보는 Markdown/HTML과 시스템 연동용 JSON을 제공한다. | SARIF는 외부 연동 요구가 있을 때 추가 |
+| AI remediation advisor | finding 조치 가이드를 AI(공개 Gemini API)로 보강해 보고서에 advisory로 추가한다. 상세는 [AI_REMEDIATION.md](./AI_REMEDIATION.md). | 기본 OFF opt-in, egress 허용 환경에서만. 판정 불개입, 마스킹·provenance·실패격리 필수 |
 
 ## 후순위 또는 2차 기능
 

@@ -29,6 +29,7 @@ test 가능한 상태여야 한다.
 | M6 | Optional telemetry/inventory extension | 선택 | Phase 2 전용. OTel/LGTM/OSQuery/runtime telemetry는 별도 설계 검토 후 도입 |
 | M7 | Final-check dashboard | 2-3일 | Overview, Targets, Assessments, Findings, Reports, Governance 메뉴 캡처 |
 | M8 | Final-check validation | 1일 | delivery artifact scan, applied cluster configuration scan, report generation, Secret redaction, exception status, evidence bundle, no-auto-remediation guardrail end-to-end 검증 |
+| M9 | AI remediation advisor (선택) | 선택 | 기본 OFF opt-in. ON 시 redaction·advisory sidecar·provenance·`scan_health` degraded 생성, AI ON/OFF 판정 동일. 상세는 [AI_REMEDIATION.md](./AI_REMEDIATION.md) |
 
 ## 첫 구현 블록
 
