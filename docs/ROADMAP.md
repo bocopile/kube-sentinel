@@ -8,7 +8,7 @@ PoC는 수직 slice 단계로 구현한다.
 | Stage | 범위 | Exit criteria |
 | --- | --- | --- |
 | S0 | Assessment prerequisite | Mgmt namespace, Biz Cluster kubeconfig Secret, target preflight, bootstrap policy, read-only RBAC, image access, report store write test 통과 |
-| S0.5 | Delivery artifact security assessment baseline | SAST, Secret, Image, SBOM, Integrity, Manifest/RBAC, Dockerfile, Script, artifact input manifest, scanner baseline, scan health report 생성 및 정규화 |
+| S0.5 | Delivery artifact security assessment baseline | SAST/Secret/Manifest/RBAC/Dockerfile/Script finding 생성·정규화와 artifact input manifest·scanner baseline·scan health report 검증. Image/SBOM/Integrity는 scanner config·fixture·baseline placeholder만 두고, 실제 Trivy delivery image scan·SBOM·integrity 생성은 S3/M5(P7)에서 구현한다 |
 | S1 | Report store와 finding schema spike | Security Assessment/Trivy fixture가 PostgreSQL `raw_reports`/`findings`, stable finding ID, metadata record, evidence export artifact, evidence bundle로 변환 |
 | S2 | Mgmt 단일 operator와 assessment vertical slice | `ClusterTarget`, `SecurityAssessment`, `ScanRun`이 Feature orchestrator/registry, remote apply/read-only inspection으로 assessment Job과 report record 생성 |
 | S3 | 나머지 assessment capability | Trivy delivery image scan과 applied cluster config scan을 각각 enable/disable, assess, verify 가능 |

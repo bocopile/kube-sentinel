@@ -828,6 +828,8 @@ kube-sentinel/
     ├── REQUIREMENTS.md                  # 성공 기준 정본
     ├── ARCHITECTURE.md                  # 아키텍처/CRD/RBAC/결과 저장
     ├── MODULES.md                       # 3-모듈 구조, 경계, 빌드 방법
+    ├── DATABASE.md                      # PostgreSQL 테이블 DDL, finding_id 규칙, 인덱스
+    ├── API_DESIGN.md                    # REST API 엔드포인트 명세
     ├── SECURITY_ASSESSMENT.md           # 최종점검 실행 환경/대시보드/판정 정책
     ├── ASSESSMENT_SUPPORT_FEATURES.md   # 1차 필수/선택/후순위 보조기능 범위
     ├── FRONTEND_ARCHITECTURE.md         # Final Check Dashboard 화면/데이터 모델

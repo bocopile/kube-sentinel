@@ -45,8 +45,9 @@ remote apply/read-only 방식으로 검사합니다.
 2. [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)
 3. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 4. [docs/MODULES.md](docs/MODULES.md)
-5. [docs/API_DESIGN.md](docs/API_DESIGN.md)
-6. [docs/ROADMAP.md](docs/ROADMAP.md)
+5. [docs/DATABASE.md](docs/DATABASE.md)
+6. [docs/API_DESIGN.md](docs/API_DESIGN.md)
+7. [docs/ROADMAP.md](docs/ROADMAP.md)
 
 ## 예상 모듈 구조
 

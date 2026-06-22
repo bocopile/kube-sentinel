@@ -154,6 +154,7 @@
   /scan-runs/{id}/retry` 정의 + reconciler 분기 추가.
 
 ### [I-10] M0.5 exit criteria가 M5 기능(Trivy/SBOM/Integrity)과 겹쳐 보임
+> ✅ **해결됨**: ROADMAP S0.5 exit 문구를 placeholder/baseline 수준으로 한정 — Image/SBOM/Integrity는 scanner config·fixture placeholder만, 실제 Trivy delivery image scan·SBOM·integrity 생성은 S3/M5(P7)에서 구현으로 명시.
 - **출처/검증**: X6 — confirmed(refined)
 - **근거**: ROADMAP S0.5 "Image, SBOM, Integrity … 생성 및 정규화" vs PROMPTS P5/M3 "Trivy delivery image
   scan 아직 구현 안 함", M5에서 구현.
@@ -166,7 +167,7 @@
 
 ## 3. MEDIUM — 정합성·완결성
 
-- **[I-11]** README 문서 목록·PLAN docs 트리에 DATABASE/API_DESIGN(및 MODULES) 누락 — C5+X13+U11 만장일치.
+- ✅ **[I-11]** README 문서 목록·PLAN docs 트리에 DATABASE/API_DESIGN(및 MODULES) 누락 — C5+X13+U11 만장일치.
   (협의: PLAN 트리엔 MODULES는 이미 있음 → DATABASE/API_DESIGN만 추가.)
 - ✅ **[I-12]** reconcile 순서 역전: evidence bundle/final-decision을 **생성(step 18~19) 전에 저장(step 15)** —
   X4 만장일치.
@@ -192,7 +193,7 @@
   (I-1 저장 정본 해소와 함께 다룰 것: upload token/Secret/egress vs controller pull.)
 - ✅ **[I-19]** G1 검증 기준이 ScanRun 생성 주체/순서를 모호하게 둠 — U13(refined).
   G1 절차에 ScanRun 생성 주체(사용자 vs controller 자동) 명시.
-- **[I-23]** MODULES.md "모듈 간 경계" 토폴로지 다이어그램이 `frontend (React SPA)`를 **Mgmt Cluster 박스 밖**에 배치(Biz
+- ✅ **[I-23]** MODULES.md "모듈 간 경계" 토폴로지 다이어그램이 `frontend (React SPA)`를 **Mgmt Cluster 박스 밖**에 배치(Biz
   Cluster scanner Jobs와 같은 높이) — ARCHITECTURE.md 정본(line 14·25 "Dashboard/API … in Mgmt", mermaid
   line 53~65에서 `dashboard`/`assessment_api`/`metadata_store`/`artifact_store` 모두 `subgraph mgmt`
   내부)과 모순.
