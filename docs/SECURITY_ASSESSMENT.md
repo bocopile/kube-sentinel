@@ -21,7 +21,7 @@
 
 | 구분 | 필요 항목 | 비고 |
 |------|----------|------|
-| Execution host | Linux 점검 VM 또는 CI runner | scanner 실행, report 생성, artifact mount 가능 |
+| Execution host | Mgmt Cluster 내 Mgmt-local scanner Job (Code / Artifact Scan); Biz Cluster는 read-only inspection + 옵션 remote scanner Job만 | Code / Artifact Scan은 operator가 Mgmt Cluster에 Job 생성; Biz Cluster Scan은 Mgmt operator read-only 조회 + bootstrap 허용 시 Biz remote Job. CI runner/점검 VM은 `artifactInput`을 Artifact Store/PVC에 준비하는 외부 사전 단계로만 사용 |
 | Common tools | `kubectl`, `helm`, `jq`, `yq`, Docker 또는 `nerdctl` | Helm render, applied YAML 조회, image pull/digest 조회 |
 | Source scanners | Semgrep, gosec | SAST 및 위험 코드 패턴 탐지 |
 | Secret scanner | Gitleaks | hardcoded secret/token/account 탐지 |
@@ -81,14 +81,31 @@ unavailable로 기록한다.
 | `RBACAndSecretReference` | Applied RBAC & Secret Reference Scan | Biz Cluster Scan |
 | `BuildAndDeploy` | Build & Deploy Scan | Code / Artifact Scan |
 
+각 profile이 enable하는 내부 registry feature ID와 생성 `findings.category` 요약(정본은
+[ARCHITECTURE.md](./ARCHITECTURE.md) §Profile / features → registry feature ID 매핑):
+
+| `spec.profiles[]` | registry feature ID | `findings.category` |
+|---|---|---|
+| `SourceSecurity` | `source_security`, `secret_scan` | `sast`, `secret` |
+| `ImageSupplyChain` | `image_vulnerability`, `image_integrity`, `sbom` | `image_vulnerability`, `integrity`, `sbom` |
+| `KubernetesConfig` | `kubernetes_manifest`, `rbac_review` | `kubernetes`, `rbac` |
+| `BuildAndDeploy` | `dockerfile_scan`, `script_scan` | `dockerfile`, `script` |
+| `RBACAndSecretReference` | `applied_cluster_config`, `rbac_review`, `secret_reference` | `kubernetes`, `rbac`, `secret_ref`, `network` |
+
+`spec.features[]`는 위 base set에 enable/disable·config override를 적용하고, unknown profile은
+`ConfigError`로 기록하고 무시한다. 상세 병합 규칙은 ARCHITECTURE.md를 따른다.
+
 검사 절차는 권한 모델과 실패 원인이 다르므로 `Code / Artifact Scan`과
 `Biz Cluster Scan`으로 분리한다.
 
-| 검사 그룹 | 목적 | 실행 위치 | 대표 산출물 |
-|----------|------|----------|------------|
-| Code / Artifact Scan | 납품 산출물 자체의 보안 위험 확인 | Mgmt Cluster Job, 별도 runner, CI runner, 검수 VM | SAST report, secret report, image CVE/SBOM/digest report, manifest/RBAC/Dockerfile/script report |
-| Biz Cluster Scan | Biz Cluster에 실제 적용된 설정과 권한 상태 확인 | Mgmt Controller의 read-only 조회 또는 허용된 scanner Job remote apply | applied config report, RBAC risk report, Secret reference report, cluster scan health |
-| Full Final Check | 두 검사 그룹을 순차 실행하고 최종 판정 생성 | Mgmt Cluster `ScanRun` | final-check summary, normalized findings, exception candidates |
+| 검사 그룹 | 목적 | 실행 위치 (정본) | artifact 전달 | 대표 산출물 |
+|----------|------|------------------|---------------|------------|
+| Code / Artifact Scan | 납품 산출물 자체의 보안 위험 확인 | Mgmt-local Job (`kube-sentinel-system`). Biz Cluster 접근 불필요 | init container가 `artifactInput`을 `emptyDir`로 clone/fetch | SAST report, secret report, image CVE/SBOM/digest report, manifest/RBAC/Dockerfile/script report → PostgreSQL `raw_reports` |
+| Biz Cluster Scan | Biz Cluster에 실제 적용된 설정과 권한 상태 확인 | Mgmt controller read-only inspection(기본) + 옵션 remote scanner Job(Biz `kube-sentinel-system`) | kubeconfig 기반 API 조회; remote Job은 label 추적 | applied config report, RBAC risk report, Secret reference report, cluster scan health → PostgreSQL `raw_reports` |
+| Full Final Check | 두 검사 그룹을 순차 실행하고 최종 판정 생성 | Mgmt Cluster `ScanRun` reconcile | — | final-check summary, normalized findings, exception candidates |
+
+실행 토폴로지는 위 표가 단일 정본이다. 검사 그룹이 실행 위치를 deterministic하게 결정하므로
+`SecurityAssessment`/`ScanRun` spec에 runner placement(`mgmt-local`|`biz-remote`) 선택 필드를 추가하지 않는다.
 
 Code / Artifact Scan 프로파일:
 
@@ -123,20 +140,34 @@ Code / Artifact Scan 결과와 분리된 cluster scan health로 기록한다.
 
 목적은 Biz Cluster 접근 없이 납품 산출물 자체의 위험을 판단하는 것이다.
 
+Code / Artifact Scan은 Mgmt-local Job으로 실행한다. `SecurityAssessment.spec.artifactInput`을
+init container가 Job의 `emptyDir` 공유 volume으로 전달한 뒤 scanner container가 read-only로 mount한다.
+전달 규약:
+
+| `artifactInput` 필드 | 전달 방식 |
+|----------------------|-----------|
+| `sourceRef.path` / `manifestRef.path` | operator가 준비한 입력 mount에서 init container가 `emptyDir`로 복사 |
+| `sourceRef.artifactStorePath` / `manifestRef.artifactStorePath` | init container가 Artifact Store에서 fetch 후 checksum 검증 |
+| `imageList[].tarPath` | offline image tar를 `emptyDir`로 fetch |
+| `imageList[].image` / `digestList[]` | registry digest 조회·pull(registry credential) |
+
 ```text
-1. 산출물 입력 검증
+1. artifactInput preflight (Mgmt Cluster, Biz Cluster 미접속)
+   - manifestRef/sourceRef/imageList/digestList 존재 확인
    - source, Dockerfile, Helm/YAML, RBAC manifest, script 존재 확인
    - image list, approved digest list, registry credential 확인
-2. scanner 기준선 확인
+   - checksum이 있으면 fetch 전후 digest 일치 검증 (누락·불일치 → scan_health=Fail)
+2. Mgmt-local Job init container가 artifactInput을 emptyDir 공유 volume으로 clone/fetch
+3. scanner 기준선 확인
    - scanner version
    - vulnerability DB/rule 기준일
    - policy bundle version
-3. source/secret scan 실행
-4. image/SBOM/digest/signature scan 실행
-5. manifest/RBAC/Dockerfile/script scan 실행
-6. raw report 저장(PostgreSQL raw_reports)
-7. finding 정규화
-8. `ScanRun.status.artifactScan` 갱신
+4. source/secret scan 실행 (emptyDir mount)
+5. image/SBOM/digest/signature scan 실행
+6. manifest/RBAC/Dockerfile/script scan 실행
+7. raw report 저장(PostgreSQL raw_reports)
+8. finding 정규화
+9. `ScanRun.status.artifactScan` 갱신
 ```
 
 실패 기준:
@@ -222,6 +253,12 @@ workload, RBAC, Service, Ingress, Secret을 자동으로 수정하지 않는다.
 | Existing exception review file | 선택 | 이전에 승인된 예외, 만료일, 승인자, 사유를 입력으로 재사용 |
 | Generated exception review artifact | 필수 산출물 | 이번 ScanRun에서 생성된 예외 후보, owner, 사유, 만료일, 승인 상태 추적 |
 | ClusterTarget | 필요 시 | read-only kubeconfig Secret을 참조하는 Biz Cluster 등록 정보 |
+
+위 입력은 `SecurityAssessment.spec.artifactInput`(`sourceRef`/`imageList`/`digestList`/`manifestRef`)으로
+선언하고, Code / Artifact Scan Mgmt-local Job의 init container가 `emptyDir` 공유 volume으로 전달한다.
+preflight는 입력 manifest의 존재와 checksum을 검증하며, 누락·checksum 불일치는 `scan_health=Fail`(필수
+산출물 누락)로 기록한다. 대용량 원문은 CRD에 인라인하지 않고 Artifact Store `artifact-input.yaml` 및 입력
+경로 참조만 둔다.
 
 ## Cluster Access Policy
 

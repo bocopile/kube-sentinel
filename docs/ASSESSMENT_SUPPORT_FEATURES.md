@@ -20,7 +20,7 @@
 | 기능 | 목적 | 산출물/상태 |
 |------|------|-------------|
 | Target preflight check | kubeconfig 누락, API unreachable, RBAC denied, namespace 누락, 금지된 Secret read 권한을 실제 scan 전에 분리한다. | `ClusterTarget.status`, `ScanRun.status.clusterScan`, preflight report |
-| Artifact input manifest | source path, image list, digest list, Helm/YAML, RBAC, Dockerfile, script 위치를 한 파일로 선언해 scan 재현성을 확보한다. | `artifact-input.yaml`, input validation report |
+| Artifact input manifest | `SecurityAssessment.spec.artifactInput` 및 `artifact-input.yaml`로 source path, image list, digest list, Helm/YAML, RBAC, Dockerfile, script 위치와 checksum을 선언한다. preflight에서 존재·checksum 검증 후 Code / Artifact Scan Mgmt-local Job의 init container가 Artifact Store/PVC에서 `emptyDir`로 staging한다. | `artifact-input.yaml`, input validation report, Mgmt-local Job staging mount |
 | Scanner version / DB baseline capture | Trivy DB, Grype DB, Semgrep rule, Gitleaks rule, policy bundle 기준일을 기록한다. | scanner baseline report |
 | Finding stable ID / deduplication | 같은 CVE/rule finding이 재스캔 때 중복 집계되지 않도록 안정 ID를 만든다. | deterministic `finding_id`, dedup summary |
 | Secret redaction guard | report, log, dashboard, artifact에 Secret 원문이 섞이지 않도록 마지막 방어선을 둔다. | redaction check result, blocked output log |

@@ -13,7 +13,7 @@ Cluster를 등록하고, 납품 산출물 보안 평가를 실행하며, remote 
 
 | ID | 요구사항 | 검증 방법 |
 | --- | --- | --- |
-| G1 | `ClusterTarget`와 `SecurityAssessment` CR을 생성하면 management controller가 선택된 Biz Cluster에 활성화된 assessment workload를 생성한다. | Mgmt Cluster에서 `kubectl get clustertarget,securityassessment,scanrun`, Biz Cluster target namespace에서 `kubectl get job,cronjob,cm,sa,role,rolebinding` 확인 |
+| G1 | `ClusterTarget`와 `SecurityAssessment` CR을 생성하면 management controller가 Code / Artifact Scan은 Mgmt-local Job으로 실행하고, Biz Cluster Scan은 read-only inspection(옵션으로 허용된 remote scanner Job)으로 실행한다. | Mgmt Cluster에서 `kubectl get clustertarget,securityassessment,scanrun`과 Mgmt-local Code / Artifact Scan Job 확인. Biz Cluster Scan을 remote Job으로 실행하도록 구성한 경우에만 Biz Cluster target namespace에서 `kubectl get job,cronjob,cm,sa,role,rolebinding` 확인 |
 | G2 | Feature toggle은 feature별 managed resource를 생성하거나 제거한다. | `spec.features[].enabled` patch 후 resource 생성/삭제 확인 |
 | G3 | allowlist 기반 scan resource config로 선택된 scan Job의 resource와 scheduling field를 변경할 수 있다. | `spec.scanResources` patch 후 생성된 workload spec과 거부된 금지 field 확인 |
 | G4 | Trivy와 security assessment data는 PostgreSQL query record와 evidence/export artifact로 정규화된다. | `raw_reports`, `findings`, scan health, evidence/export artifact 검토 |
@@ -85,14 +85,14 @@ G1~G19는 1차 필수 성공 기준이다. G20/G21은 AI remediation advisor opt
 
 - Mgmt Cluster는 Biz Cluster kubeconfig Secret을 저장하고 kube-sentinel
   management controller를 실행한다.
-- remote scanner Job이 활성화된 경우 Biz Cluster는 필요한 assessment Job을 허용한다.
+- Code / Artifact Scan scanner Job은 Mgmt Cluster에만 생성한다. Biz Cluster remote scanner Job은 Biz Cluster Scan profile + bootstrap/capability 허용 시에만 생성한다.
 - Biz Cluster 누락 항목은 preflight에서 먼저 식별한다. Mgmt operator는
   `ClusterTarget.spec.bootstrapPolicy`가 허용한 kube-sentinel 전용 리소스만
   생성한다.
 - Report Store와 Dashboard storage는 Mgmt Cluster 안에 있거나 Mgmt Cluster에서 접근 가능하다.
 - dashboard/API filtering은 PostgreSQL `raw_reports`/`findings`/summary records를 사용한다.
   Artifact Store의 `manifest.json`은 `artifact_index` 재생성에만 사용하며 raw/finding 정본을 대체하지 않는다.
-- image scanner와 필요한 scanner image는 선택된 runner에서 설치 또는 실행 가능하다.
+- image scanner와 필요한 scanner image는 Mgmt Cluster scanner Job image 또는 해당 Job이 접근 가능한 registry/artifact path에서 실행 가능하다.
 - Biz Cluster는 승인된 namespace와 applied configuration assessment에 필요한
   cluster-level RBAC resource 범위의 read-only credential로 조회할 수 있다.
 - target kubeconfig Secret data는 status, dashboard, log, report에 노출하지 않는다.

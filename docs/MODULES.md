@@ -51,7 +51,7 @@ operator/
 │   │
 │   ├── feature/
 │   │   ├── feature.go                   # Feature interface
-│   │   ├── registry.go                  # priority registry
+│   │   ├── registry.go                  # priority registry + profile/features merge resolver
 │   │   ├── store.go                     # DesiredStateStore
 │   │   ├── types.go                     # FeatureCondition, scan resource config
 │   │   ├── target_preflight/feature.go  # Priority 10
@@ -63,6 +63,8 @@ operator/
 │   │   ├── sbom/feature.go              # Priority 100
 │   │   ├── kubernetes_manifest/feature.go # Priority 150
 │   │   ├── rbac_review/feature.go       # Priority 150
+│   │   ├── dockerfile_scan/feature.go   # Priority 150
+│   │   ├── script_scan/feature.go       # Priority 150
 │   │   ├── applied_cluster_config/feature.go # Priority 200
 │   │   ├── secret_reference/feature.go  # Priority 200
 │   │   ├── trivy_operator_reports/feature.go # Priority 200

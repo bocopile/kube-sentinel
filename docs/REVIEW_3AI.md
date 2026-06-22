@@ -55,16 +55,19 @@
 - **합의 권고**: `FinalDecision` struct(`status`,`reasons[]`,`decidedAt`)와 `ScanRunStatus`/`SecurityAssessmentStatus`를 ARCHITECTURE 기준으로 PLAN에 확정, API 응답·FRONTEND state model 동일 스키마로 정렬.
 
 ### [I-5] profiles[] → feature 매핑 및 features[]/profiles[] 병합 규칙 미정의
+> ✅ **해결됨** (3-AI 협의 후 적용): ARCHITECTURE에 profile→registry feature ID→category 정본 표 + 6단계 병합 규칙(profiles=base set, features=override, unknown=ConfigError) 추가. SECURITY_ASSESSMENT/API/PLAN은 요약·참조. `BuildAndDeploy`용 `dockerfile_scan`/`script_scan` registry feature ID 신설, `network`→RBACAndSecretReference 매핑.
 - **출처/검증**: U6 — 만장일치 confirmed(medium 신뢰)
 - **근거**: ARCHITECTURE는 `features[].name` umbrella → registry feature ID 확장 예시(trivy→image_vulnerability…)만 제시. `SourceSecurity`/`KubernetesConfig` 등 profile이 어떤 feature를 enable하는지 표가 없고, profiles[]와 features[]가 둘 다 spec에 존재할 때 병합/우선순위 규칙이 없음.
 - **합의 권고**: profile→feature ID 매핑 표 + 병합 규칙 + unknown profile 처리(`ConfigError`)를 ARCHITECTURE/PLAN에 단일 정본으로 추가.
 
 ### [I-6] Code/Artifact Scan 실행 토폴로지 및 artifact input 전달 경로 미정의
+> ✅ **해결됨** (3-AI 협의 후 적용): 단일 모델 확정 — Code/Artifact Scan=Mgmt-local Job, Biz Cluster Scan=read-only inspection+옵션 Biz-remote scanner Job. runner placement CRD 필드는 **미추가**(검사 그룹이 위치를 결정). artifactInput은 init container+`emptyDir`로 staging, preflight checksum 검증. ARCHITECTURE에 전용 섹션 "Runner placement and artifact input delivery" 신설, G1을 실행 모델과 정렬.
 - **출처/검증**: U2(critical, refined) + U5 — confirmed(범위 조정)
 - **근거**: G1은 "controller가 Biz Cluster에 assessment workload 생성"이라 cluster-side 실행을 시사하나, SECURITY_ASSESSMENT는 Code/Artifact Scan을 "Mgmt Cluster Job/별도 runner/CI runner/검수 VM"으로 둠. 소스/이미지 등 입력을 어느 runner로 어떻게 전달하는지(PVC/Git ref/init container) 미정의. (협의: "Biz remote Job과 정면 충돌"은 과장 → "runner placement + artifact input 전달 계약 미정의"로 축소.)
 - **합의 권고**: `SecurityAssessment`/`ScanRun` spec에 runner placement(`mgmt-local`|`biz-remote`) 필드 추가, artifact input 마운트/동기화 규약을 reconcile flow에 명시.
 
 ### [I-7] PLAN Security Finding Schema category enum이 secret_ref·network 누락
+> ✅ **해결됨** (I-5 작업 중 함께 적용): PLAN Security Finding Schema category enum에 `secret_ref`·`network` 추가 → DATABASE/SECURITY_ASSESSMENT/FRONTEND와 일치.
 - **병합**: C4 + X7 — 만장일치 confirmed
 - **근거**: PLAN category 목록(line 479)에 `secret_ref`,`network` 없음. DATABASE/SECURITY_ASSESSMENT/FRONTEND/ARCHITECTURE는 포함. PLAN을 정본 삼은 schema validator가 secret_reference·exposure finding을 조용히 reject.
 - **합의 권고**: PLAN enum에 `secret_ref`,`network` 추가하여 DATABASE와 일치.

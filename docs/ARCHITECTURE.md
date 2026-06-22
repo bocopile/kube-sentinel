@@ -424,7 +424,7 @@ Required first-scope support features:
 | Support feature | Architecture responsibility |
 | --- | --- |
 | Target preflight check | Separate target environment failures from actual security findings before Biz Cluster scans run. |
-| Artifact input manifest | Provide a reproducible declaration of source paths, images, digest lists, manifests, RBAC, Dockerfiles, and scripts. |
+| Artifact input manifest | Provide a reproducible declaration of source paths, images, digest lists, manifests, RBAC, Dockerfiles, and scripts. `SecurityAssessment.spec.artifactInput`으로 선언하고, Code / Artifact Scan Mgmt-local Job의 init container가 `emptyDir` 공유 volume으로 전달하며 preflight에서 존재·checksum을 검증한다. |
 | Scanner version / DB baseline capture | Store scanner versions, vulnerability DB dates, and policy/rule versions with each ScanRun. |
 | Finding stable ID / deduplication | Generate deterministic IDs and avoid duplicate counts across repeated scans or Trivy input paths. |
 | Secret redaction guard | Block raw Secret values from reports, logs, dashboard records, and evidence bundles. |
@@ -495,6 +495,8 @@ Feature별 책임:
 | `kubernetes_manifest` | Helm/YAML/kube-linter/conftest 기반 manifest finding 생성 |
 | `applied_cluster_config` | Biz Cluster read-only workload/securityContext/volume/image 설정 검사 |
 | `rbac_review` | RBAC 과권한, wildcard, cluster-admin binding 검사 |
+| `dockerfile_scan` | Hadolint 기반 Dockerfile 위험 설정 finding 생성 |
+| `script_scan` | ShellCheck 기반 deployment script 위험 finding 생성 |
 | `secret_reference` | Secret raw value 없이 env/envFrom/volume/ServiceAccount token reference 검사 |
 | `trivy_operator_reports` | 기존 Trivy Operator `VulnerabilityReport` 선택 read-only 수집 |
 | `remediation_enrichment` | (선택, 기본 OFF) final decision 확정 후 AI 조치 가이드 advisory 생성. 상세는 [AI_REMEDIATION.md](./AI_REMEDIATION.md) |
@@ -508,16 +510,54 @@ Priority 기본값:
 | 20 | `bootstrap` | 허용된 누락 리소스를 검사 전에 준비 |
 | 50 | `source_security`, `secret_scan` | code/artifact finding을 먼저 생성 |
 | 100 | `image_vulnerability`, `image_integrity`, `sbom` | image digest 기준 CVE/SBOM/무결성 finding 생성 |
-| 150 | `kubernetes_manifest`, `rbac_review` | 납품 manifest/RBAC 정책 점검 |
+| 150 | `kubernetes_manifest`, `rbac_review`, `dockerfile_scan`, `script_scan` | 납품 manifest/RBAC/Dockerfile/script 정책 점검 |
 | 200 | `applied_cluster_config`, `secret_reference`, `trivy_operator_reports` | Biz Cluster 적용 상태와 선택 입력 정규화 |
 | 250 | `remediation_enrichment` | final decision 확정 후 AI 조치 가이드 생성 (선택, 기본 OFF) |
 | 300 | `report_export` | 모든 finding과 scan health를 종합해 report/evidence 생성 |
 
-`SecurityAssessment.spec.features[].name`은 사용자 노출 feature 명칭이며 내부 registry
-feature ID로 확장된다. 예: `trivy`는 `image_vulnerability`, `image_integrity`, `sbom`,
-`trivy_operator_reports`로, `security_assessment`는 source/secret/manifest/rbac/applied
-계열 feature로 매핑된다. umbrella 명칭과 registry feature ID 어디에도 없는 이름은
-ConfigError로 처리한다.
+### Profile / features → registry feature ID 매핑 (정본)
+
+`SecurityAssessment.spec.profiles[]`는 registry feature ID **base set**을 결정하고,
+`spec.features[]`는 umbrella 확장·enable/disable·config override를 적용한다.
+아래 표가 profile→registry feature ID→`findings.category` 단일 정본이며,
+`category` 값은 [DATABASE.md](./DATABASE.md) `findings.category` enum과 일치한다
+(feature ID `image_integrity`/`secret_reference`/`source_security`와 category
+`integrity`/`secret_ref`/`sast`는 의미는 같고 표기가 다름에 유의).
+
+| `spec.profiles[]` 값 | Workflow | enabled registry feature ID | 생성 `findings.category` |
+|---|---|---|---|
+| `SourceSecurity` | Code / Artifact Scan | `source_security`, `secret_scan` | `sast`, `secret` |
+| `ImageSupplyChain` | Code / Artifact Scan | `image_vulnerability`, `image_integrity`, `sbom` | `image_vulnerability`, `integrity`, `sbom` |
+| `KubernetesConfig` | Code / Artifact Scan | `kubernetes_manifest`, `rbac_review` | `kubernetes`, `rbac` |
+| `BuildAndDeploy` | Code / Artifact Scan | `dockerfile_scan`, `script_scan` | `dockerfile`, `script` |
+| `RBACAndSecretReference` | Biz Cluster Scan | `applied_cluster_config`, `rbac_review`, `secret_reference` | `kubernetes`, `rbac`, `secret_ref`, `network` |
+
+umbrella `features[].name` 확장:
+
+| umbrella `name` | registry feature ID |
+|---|---|
+| `trivy` | `image_vulnerability`, `image_integrity`, `sbom`, `trivy_operator_reports` |
+| `security_assessment` | `source_security`, `secret_scan`, `kubernetes_manifest`, `rbac_review`, `dockerfile_scan`, `script_scan`, `applied_cluster_config`, `secret_reference` |
+
+`scan_health`는 특정 profile이 아니라 scanner pipeline 전반의 실패에서 생성되는 공통
+category이므로 위 표에 행별로 넣지 않는다. `target_preflight`/`bootstrap`/`report_export`는
+profile과 무관한 lifecycle feature이고, `trivy_operator_reports`는 `ImageSupplyChain`과
+target capability 허용 시, `remediation_enrichment`는 `aiRemediation.enabled=true`일 때만
+enabled된다.
+
+**features 병합 규칙** — orchestrator는 다음 순서로 enabled feature set을 deterministic하게 resolve한다.
+
+1. `ScanRun.spec.profiles[]`가 비어 있지 않으면 `SecurityAssessment.spec.profiles[]` 대신 사용한다(override).
+2. effective profiles를 위 표로 registry feature ID 집합(base set)으로 union한다. 중복 profile은 한 번만 적용한다.
+3. `features[].name`을 umbrella 표로 registry feature ID 목록으로 확장한다.
+4. `features[].enabled=true`는 base set에 추가(∪), `enabled=false`는 제거(−)한다.
+5. `features[].config`는 해당 feature에 항상 우선 적용한다(profile 기본 config override). 동일 feature ID가 여러 번이면 마지막 `features[]` 항목이 이긴다.
+6. 최종 enabled set = (profiles 확장 ∪ `features[].enabled=true`) − (`features[].enabled=false`). priority 오름차순, 같은 priority는 feature ID 사전순으로 정렬한다.
+
+umbrella 명칭·registry feature ID·profile 매핑 표 어디에도 없는 `features[].name` 또는
+`profiles[]` 값은 `ConfigError`로 status(`status.features[].reason=ConfigError` 또는
+`status.conditions`)에 기록하고 해당 항목만 무시한다. unknown 항목 하나가 전체 scan을
+실패시키지 않으며, 나머지 valid feature는 정상 실행한다.
 
 ## Reconcile flow
 
@@ -525,14 +565,16 @@ ConfigError로 처리한다.
 2. `SecurityAssessment`를 로드한다.
 3. 선택된 `ClusterTarget`을 로드한다.
 4. `ScanRun` 실행 context를 생성한다.
-5. enabled feature를 resolve하고 priority 순서로 정렬한다.
+5. `profiles[]`를 매핑 정본 표로 base set으로 확장하고 `features[]`(enable/disable·config override)와
+   병합해 enabled feature를 deterministic하게 resolve한 뒤, priority → feature ID 사전순으로 정렬한다.
+   unknown profile/feature는 `ConfigError`로 기록하고 제외한다.
 6. feature별 `Validate()`를 실행한다.
 7. feature별 `Preflight()`를 실행해 target 환경 실패를 scanner finding과 분리한다.
 8. bootstrap 정책상 허용된 누락 항목만 `Build()` 결과에 포함한다.
-9. feature별 `Build()`로 Mgmt-local/Biz-remote desired resource를 생성한다.
-10. Mgmt-local object를 server-side apply로 적용한다.
-11. target-remote scan object를 remote apply client로 적용한다.
-12. local runner 또는 remote scanner Job에서 raw report를 수집한다.
+9. feature별 `Build()`로 Code / Artifact Scan은 Mgmt-local Job desired state(artifact-fetch init container + input/output `emptyDir`)를, Biz Cluster Scan은 read-only inspection과 옵션 Biz-remote scanner Job desired state를 분리 생성한다.
+10. Mgmt-local object(Code / Artifact Job 포함)를 server-side apply로 적용한다.
+11. Biz Cluster Scan용 bootstrap 또는 옵션 remote scanner object만 remote apply client로 적용한다.
+12. Mgmt-local Job·Biz read-only inspection·옵션 remote scanner Job에서 raw report를 수집해 PostgreSQL `raw_reports`에 저장한다(Artifact Store에 raw 정본 경로를 만들지 않음 — §Runner placement and artifact input delivery).
 13. feature별 `Collect()`로 artifact reference를 수집한다.
 14. feature별 `Normalize()`로 normalized finding과 scan health를 생성한다.
 15. queryable ScanRun, raw scanner output(`raw_reports`), normalized finding(`findings`),
@@ -544,6 +586,39 @@ ConfigError로 처리한다.
 18. Code / Artifact Scan과 Biz Cluster Scan 결과를 상관 분석한다.
 19. Evidence Bundle과 Exception Review 후보를 생성한다.
 20. `ClusterTarget.status`와 `ScanRun.status`를 갱신한다.
+
+## Runner placement and artifact input delivery
+
+Runner placement는 검사 그룹이 deterministic하게 결정하므로 `runnerPolicy`/`placement`
+CRD 필드를 추가하지 않는다. Code / Artifact Scan은 항상 Mgmt-local Job이고,
+Biz Cluster Scan은 항상 Mgmt operator read-only inspection(+옵션 remote scanner Job)이다.
+
+| Workflow | runner 위치 | 생성 주체 | raw report 수집 |
+|---|---|---|---|
+| Code / Artifact Scan | Mgmt Cluster Mgmt-local Job (`kube-sentinel-system`) | Mgmt operator SSA | Job 출력 → operator `Collect()` → PostgreSQL `raw_reports` |
+| Biz Cluster Scan (read-only) | Mgmt operator 프로세스(Biz kubeconfig) | Mgmt operator | API snapshot → PostgreSQL `raw_reports` |
+| Biz Cluster Scan (optional scanner Job) | Biz Cluster remote Job | Mgmt operator remote SSA | Job 출력 → operator `Collect()` → PostgreSQL `raw_reports` |
+
+### Artifact input 전달 규약
+
+Code / Artifact Scan은 `SecurityAssessment.spec.artifactInput`(`sourceRef`/`imageList`/
+`digestList`/`manifestRef`)을 Mgmt-local Job의 init container가 `emptyDir`(또는 run-scoped
+PVC) 공유 volume으로 전달하고, scanner container는 그 volume을 read-only로 mount한다.
+Biz Cluster에는 artifact 원문을 복제하지 않는다.
+
+1. **Preflight**: `artifactInput` 참조(path/artifactStorePath/imageList/digestList) 존재와,
+   `checksum`이 있으면 fetch 전후 digest 일치를 검증한다. 누락·checksum 불일치는
+   `scan_health=Fail`(필수 산출물 누락)로 기록하고 `ScanRun.status.artifactScan`을 `Failed`로 둔다.
+2. **Staging(init container)** — `emptyDir`(또는 run-scoped PVC) 공유 volume:
+
+| `ArtifactInputSpec` 필드 | 전달 방식 |
+|---|---|
+| `sourceRef.path` / `manifestRef.path` | operator가 준비한 입력 mount(PVC 등)에서 `emptyDir`로 복사 |
+| `sourceRef.artifactStorePath` / `manifestRef.artifactStorePath` | Artifact Store에서 fetch 후 checksum 검증 |
+| `imageList[].tarPath` | offline image tar를 `emptyDir`로 fetch |
+| `imageList[].image` / `digestList[]` | registry digest 조회·pull(registry credential 사용) |
+
+3. **Scanner container**는 staging mount만 읽고, raw output은 PostgreSQL `raw_reports`에 저장한다(저장 정본은 PostgreSQL).
 
 Reconciler는 scanner별 세부 구현을 알지 않는다. 새 scanner 또는 저장소 backend는
 Feature plugin 또는 Artifact Store backend plugin으로 추가하며, Reconciler의
@@ -576,9 +651,11 @@ applied.
 
 ## HostPath policy
 
-HostPath mounts are not required for the first MVP. Code / Artifact Scan and
-Biz Cluster Read-only Scan should run through scanner Jobs and Kubernetes API
-inspection. Any future hostPath usage requires an architecture update, explicit
+HostPath mounts are not required for the first MVP. Code / Artifact Scan runs as a
+Mgmt-local Job and stages `artifactInput` through an init container and an `emptyDir`
+(or run-scoped PVC) shared volume; Biz Cluster Scan runs through Kubernetes API
+read-only inspection and an optional allowed remote scanner Job. hostPath mounts are
+not used. Any future hostPath usage requires an architecture update, explicit
 customer approval, and a security review.
 
 ## Ownership model

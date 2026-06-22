@@ -247,7 +247,7 @@ ScanRun CR을 생성해 scan을 트리거한다. 내부적으로 k8s API에 Scan
 }
 ```
 
-**응답 `400`:** assessment_name 없음, targets 참조 오류 또는 profiles enum 오류.
+**응답 `400`:** assessment_name 없음, targets 참조 오류 또는 profiles enum 형식 오류. (reconcile 단계에서만 발견되는 unknown profile은 HTTP 400으로 중복 거부하지 않고 ScanRun `status.features[]`에 `ConfigError`로 기록한 뒤 해당 profile만 무시한다.)
 
 ---
 
@@ -633,6 +633,8 @@ Required → Requested → Approved → Expired
 | `KubernetesConfig` | K8s 매니페스트 & RBAC 스캔 | Code / Artifact Scan |
 | `RBACAndSecretReference` | 적용된 RBAC & Secret 참조 스캔 | Biz Cluster Scan |
 | `BuildAndDeploy` | 빌드 & 배포 스캔 | Code / Artifact Scan |
+
+`profiles[]`는 base feature set을 결정하고 `features[]`가 enable/disable·config override를 적용한다. profile→registry feature ID 정본은 [ARCHITECTURE.md](./ARCHITECTURE.md) §Profile / features → registry feature ID 매핑이다. backend는 enum/참조 값 검증만 하고, 실제 병합·resolve와 unknown profile의 `ConfigError` 처리는 operator가 deterministic하게 수행한다.
 
 ---
 

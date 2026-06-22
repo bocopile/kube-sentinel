@@ -163,8 +163,8 @@ store의 stable path를 참조해 다운로드한다. PostgreSQL이 query 정본
 
 | Workflow | UI 상태 | 대표 실패 원인 | 재실행 단위 |
 |----------|---------|----------------|-------------|
-| Code / Artifact Workflow | `artifactScan.phase` | missing artifact, scanner error, stale DB/rule, registry pull failure, digest mismatch | Code / Artifact Scan만 재실행 |
-| Biz Cluster Workflow | `clusterScan.phase` | kubeconfig missing, API unreachable, RBAC denied, namespace allowlist violation, optional CRD/bootstrap unavailable | Biz Cluster Scan만 재실행 |
+| Code / Artifact Workflow | `artifactScan.phase` | missing artifact, artifactInput checksum mismatch, scanner error, stale DB/rule, registry pull failure, digest mismatch | Code / Artifact Scan만 재실행 (Mgmt-local Job) |
+| Biz Cluster Workflow | `clusterScan.phase` | kubeconfig missing, API unreachable, RBAC denied, namespace allowlist violation, optional CRD/bootstrap unavailable | Biz Cluster Scan만 재실행 (read-only + optional Biz-remote Job) |
 | Final Decision Workflow | `finalDecision.status` | Critical finding, Secret exposure, unapproved exception, expired exception | 전체 또는 실패 workflow 재실행 후 재판정 |
 
 워크플로우 상세 화면은 같은 `ScanRun` 안에서 단계별 timestamps,

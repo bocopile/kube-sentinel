@@ -115,7 +115,7 @@ operator/ 초기화 (operator/ 디렉터리 안에서):
 - Feature interface (ID, Priority, Validate, Preflight, Build, Collect, Normalize),
   feature registry, priority-ordered orchestrator skeleton.
 - ArtifactStore interface (filesystem / S3-compatible plugin).
-- registry ordering과 unknown feature validation unit test.
+- registry ordering, profile→feature resolution, `profiles[]`/`features[]` merge, unknown profile/unknown feature `ConfigError` validation unit test.
 
 optional inventory, OTel, LGTM, runtime sensor, backend 모듈, frontend 모듈은
 아직 구현하지 않는다.
@@ -301,8 +301,9 @@ docs/ROADMAP.md의 M3, Security Assessment feature를 구현한다.
 작업 디렉터리: operator/
 
 - security_assessment feature config default와 validation.
-- delivery artifact scan을 위한 Assessment Job/CronJob resource.
-- scanner config mount point와 report output convention.
+- Code / Artifact delivery scan을 위한 **Mgmt-local** Assessment Job resource (Biz Cluster 미생성).
+- `artifactInput` preflight·checksum 검증과 artifact-fetch init container의 `emptyDir`/PVC/Artifact Store fetch staging.
+- scanner config mount point와 report output convention. raw report는 PostgreSQL `raw_reports`에 저장(Artifact Store에 raw canonical 경로 없음).
   raw scanner output을 PostgreSQL raw_reports 테이블에 저장
   (docs/DATABASE.md format 컬럼 규칙 준수: json/sarif/text).
 - finding normalization invocation.
