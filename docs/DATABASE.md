@@ -134,6 +134,11 @@ normalized finding.
 같은 report를 2회 처리하거나 같은 workflow를 재실행해도 동일 finding_id로 멱등 upsert되어 `UNIQUE (finding_id, scan_run_id)`
 기준 중복 집계가 발생하지 않는다(M5 dedup).
 `exception_status`는 `exception_reviews`와 sync해 join 없이 필터 가능하다.
+MVP에서 `finding_id`가 중복 집계·예외 carry-over의 단일 매칭 키다(별도 `fingerprint` 컬럼 없음). 예외 정책
+패턴/scope 매칭용 `fingerprint` generated column은 Phase2 plugin에서만 추가한다.
+dashboard 기본 Findings 뷰의 "OPEN"은 새 컬럼이 아니라 쿼리 프리셋이다 —
+`scan_status IN ('Fail','Error') AND exception_status IN ('None','Required','Requested','Rejected','Expired')`.
+`Approved` finding은 숨기지 않고 기본 목록에서 접되 전체 필터·상세·예외 관리·PDF·evidence에서 항상 조회된다.
 
 ```sql
 CREATE TABLE findings (
@@ -243,6 +248,10 @@ CREATE INDEX idx_scan_health_status  ON scan_health(scan_run_id, status);
 
 finding별 예외 승인 이력.
 status machine을 강제한다.
+MVP 정본은 이 per-finding `exception_reviews` 테이블이다(finding_id별 개별 승인). 예외 정책(패턴/scope 매칭)
+모델 `exception_policies`, `findings.fingerprint` 컬럼, `REVOKED`/`FALSE_POSITIVE` 상태 확장은 Phase2 plugin이며,
+도입 시에도 `exception_reviews`를 대체하지 않고 review row를 생성/추천하는 보완 계층으로 둔다.
+`FALSE_POSITIVE`(오탐)는 MVP에서 별도 enum이 아니라 예외 요청 `reason` 분류로 기록한다.
 
 ```
 Required → Requested → Approved

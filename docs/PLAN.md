@@ -615,7 +615,7 @@ export로만 사용한다.
 |------|------|
 | 1차 필수 | Target preflight, Artifact input manifest, scanner baseline capture, stable finding ID/deduplication, Secret redaction guard, Evidence bundle export, Exception review artifact, Scan health summary |
 | 1차 선택 | Policy severity mapping, Finding schema validator, Namespace allowlist validator, Image digest resolver, read-only RBAC manifest generator, Trivy Operator `VulnerabilityReport`, Markdown/JSON report export |
-| 후순위/2차 | Applied vs delivery manifest comparison, dashboard deep link metadata, audit log, OSQuery, OTel/LGTM telemetry, runtime event/drift, long-running DaemonSet sensor |
+| 후순위/2차 | Applied vs delivery manifest comparison, dashboard deep link metadata, audit log, OSQuery, OTel/LGTM telemetry, runtime event/drift, long-running DaemonSet sensor, exception policy(`exception_policies`) 패턴/scope 매칭, `findings.fingerprint` 자동 매칭, `REVOKED`/`FALSE_POSITIVE` enum, Kubescape CLI scanner plugin |
 
 ### Security Finding Schema
 
@@ -853,7 +853,7 @@ kube-sentinel/
 | **M4** | Applied Cluster Configuration Scan | 2일 | Biz Cluster read-only 조회로 Workload/RBAC/Secret 참조 finding 생성 |
 | **M5** | Trivy Feature + 이미지/SBOM/무결성 점검 | 2일 | 납품 이미지 CVE/SBOM/digest 결과와 optional VulnerabilityReport 정규화 |
 | **M6** | Optional Inventory/Telemetry Extension | 선택 | OSQuery, OTel/LGTM, runtime telemetry는 별도 설계 승인 후 진행 |
-| **M7** | Final Check Dashboard | 2~3일 | Overview, Targets, Assessments, Findings, Reports, Governance 메뉴 조회 |
+| **M7** | Final Check Dashboard | 2~3일 | Overview, Targets, Assessments, Findings(6 보안 도메인 탭), Reports, 예외 관리(Governance) 메뉴 조회 |
 | **M8** | Final-check validation | 1일 | 최종 보고서, Secret redaction, exception status, evidence bundle, no-auto-remediation guardrail 확인 |
 | **M9** | AI remediation advisor (선택) | 선택 | 기본 OFF opt-in. ON 시 advisory sidecar·provenance·redaction·`scan_health=Warning` (reason=`ai_advisor_unavailable`) 생성, AI ON/OFF 판정 동일. 상세는 [AI_REMEDIATION.md](./AI_REMEDIATION.md) |
 
@@ -972,18 +972,21 @@ Biz Cluster 접근은 현재 버전에 포함하되, 실시간 런타임 탐지 
 - Severity
 - Category
 - Exception status
+- View preset: `OPEN`(기본, 조치 필요) / `Approved 포함` / `전체`. OPEN은 새 컬럼이 아니라 쿼리 프리셋이며 finding을 숨기지 않는다
 
 | 메뉴 | 목적 | 주요 화면 | 기본 액션 |
 |------|------|----------|----------|
 | Overview | 납품 가능 여부를 빠르게 판단 | 전체 Pass/Fail, Critical/High 수, scan health, 예외 필요 항목, 마지막 스캔 시각 | 실패 원인 Top 5 drill-down |
 | Targets | Biz Cluster 등록과 접근 상태 확인 | ClusterTarget, connection phase, namespace allowlist, capability, last validation time | cluster add/import, preflight 실패 원인 확인 |
 | Assessments | 검사 실행과 workflow 상태 확인 | Code / Artifact Scan, Biz Cluster Scan, Full Final Check, retry/resume state | 실패 workflow 재실행 |
-| Findings | 전체 finding 통합 분석 | Source & Secrets, Images & Integrity, Kubernetes Config & RBAC, Dockerfile & Scripts 탭 | finding 상세와 개선 가이드 확인 |
-| Reports | 검사 결과 보고서와 증적 확인 | final-check report, evidence bundle, raw reports, normalized findings, scan health summary | report/evidence export |
-| Governance | 개선/예외/재점검 추적 | 개선 권고, 예외 승인 후보, 승인/만료 예외, 재스캔 상태 | 예외 승인/만료/재점검 상태 확인 |
+| Findings | 보안 도메인별 finding 분석 (기본 OPEN 프리셋) | 6개 보안 도메인 탭 — 소스 저장소 / 컨테이너 이미지 / 무결성·공급망 / K8s 실행 환경 / 스캔 상태·산출물. `category`+`target_cluster`(NULL=매니페스트, 값=applied) 프리셋으로 구분 | finding 상세, [예외 요청]/[오탐]/[조치 완료] |
+| Reports | 검사 결과 보고서와 증적 확인 | final-check report(Markdown, optional PDF), evidence bundle, raw reports, normalized findings, scan health summary | report/evidence export |
+| 예외 관리 (Governance) | 개선/예외/재점검 추적 | 개선 권고, 예외 요청·승인 후보, 승인/만료 예외, 재스캔 상태 | 예외 요청/승인/만료/재점검 상태 확인 |
 
-세부 검사 영역인 Source & Secrets, Images & Integrity, Kubernetes Config & RBAC, Dockerfile & Scripts는
-top-level 메뉴가 아니라 Findings 또는 Assessments 내부 탭으로 제공한다.
+세부 검사 영역인 6개 보안 도메인(소스 저장소/컨테이너 이미지/무결성·공급망/K8s 실행 환경/스캔 상태·산출물)은
+top-level 메뉴가 아니라 Findings 내부 탭으로 제공한다.
+예외 승인은 finding을 숨기지 않는다 — 기본 OPEN 프리셋은 쿼리 필터일 뿐이며 `Approved`/`Expired` finding도
+DB·예외 관리·상세·PDF·evidence에 그대로 유지된다(스캔 단계 제외·DB 삭제 없음).
 상세 drill-down은 finding id 기준으로 연결한다.
 사용자는 대시보드에서 scanner 원본 report, 대상 파일/이미지/리소스, severity, 실패 기준, 개선 권고, 예외 승인 상태를 같은 흐름에서 확인할 수 있어야
 한다.

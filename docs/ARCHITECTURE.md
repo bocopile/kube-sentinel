@@ -187,6 +187,7 @@ artifact-input manifest, exported report)을 보관한다.
 | --- | --- | --- |
 | Trivy Operator | `v0.31.1` | Optional read-only `VulnerabilityReport` input only. kube-sentinel does not install or operate Trivy Operator in the first MVP. |
 | Kyverno/Gatekeeper policy bundles | organization-approved policy version | Optional policy-pack input for `kubernetes_manifest`. First MVP baseline은 kube-linter/conftest이며 kube-sentinel은 Kyverno/Gatekeeper controller를 설치·운영하지 않는다. |
+| Kubescape | organization-approved CLI version | Optional CLI-only scanner plugin input for `kubernetes_manifest`. First MVP baseline은 kube-linter/conftest를 교체하지 않는다. installed controller 형태는 "Biz Cluster에 operator를 두지 않는다" 원칙과 충돌하므로 채택하지 않는다. |
 | rbac-police | organization-approved version | Optional CLI input for `rbac_review`. First MVP baseline은 conftest + read-only applied RBAC inspection이다. |
 | Artifact Store backend | deployment-specific | Filesystem, S3-compatible, MinIO, SeaweedFS, NFS/PVC 등에서 선택한다. 코드와 API는 backend plugin interface 뒤에 둔다. |
 
@@ -799,7 +800,7 @@ Recommended formats:
 | SBOM | CycloneDX JSON; SPDX JSON accepted | Artifact Store | 수 MB 표준 포맷 파일. digest 기준 경로로 저장. |
 | Image digest/signature report | `security.imageIntegrity/v1` JSON | Artifact Store + `artifact_index` row | digest, verification result, key reference. |
 | Evidence bundle | `tar.gz` with manifest, normalized findings export, final decision, exception review, checksums | Artifact Store | 배포/검수 증적 패키지. DB가 없어도 감사 가능. |
-| Human report | Markdown source, optional PDF/HTML | Artifact Store | 사람이 읽는 최종 보고서. |
+| Human report | Markdown source, optional PDF/HTML (`artifact_index.artifact_type='human_report'`) | Artifact Store | 사람이 읽는 최종 보고서. PDF는 문서 정보·개선 권고 요약/상세·예외 검토·승인 이력·만료 예정 섹션으로 구성한다. raw JSON/SARIF/TXT/SBOM은 PDF에 병합하지 않고 `raw_reports`/download API로 연결한다. DB와 evidence bundle이 source of truth이며 PDF는 그 파생물이다. |
 | Scanner baseline | JSON (scanner version, DB date, rule hash) | Artifact Store + `artifact_index` row | 재현성 보장. |
 | Artifact input manifest | YAML | Artifact Store | scan 입력 재현 선언. |
 

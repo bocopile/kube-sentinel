@@ -47,9 +47,9 @@ Final Check Dashboard
 | Overview | 납품 가능 여부 요약 | Pass/Fail, Critical/High, failed scans, missing artifacts, exception-required count |
 | Targets | Biz Cluster 등록/상태 확인 | ClusterTarget list, cluster add/import, connection phase, namespace allowlist, last validation time |
 | Assessments | 검사 실행과 workflow 상태 확인 | Code / Artifact Scan, Biz Cluster Scan, Full Final Check, preflight status, retry/resume |
-| Findings | 전체 finding 통합 분석 | severity/category/scanner/target/status 필터, Source & Secrets, Images & Integrity, Kubernetes Config & RBAC, Dockerfile & Scripts 탭 |
-| Reports | 검사 결과 보고서와 증적 확인 | final-check report, evidence bundle, raw reports, normalized findings, scan health, export |
-| Governance | 예외와 개선 권고 추적 | remediation owner, due date, exception approval, expired exception, rescan result |
+| Findings | 보안 도메인별 finding 분석 (기본 OPEN 프리셋) | 6개 보안 도메인 탭 — 1) 소스 저장소 `sast,secret,dockerfile,script,kubernetes/rbac(target_cluster IS NULL)`, 2) 컨테이너 이미지 `image_vulnerability,sbom`, 3) 무결성·공급망 `integrity`, 4) K8s 실행 환경 `kubernetes/rbac(target_cluster IS NOT NULL),secret_ref,network`, 5) 스캔 상태·산출물 `scan_health`. 공통 severity/scanner/status 필터 공유 |
+| Reports | 보고서 export와 증적 | final-check report(Markdown source, optional PDF), evidence bundle, raw report/normalized finding download(SARIF/JSON), scan health summary |
+| 예외 관리 (Governance) | 예외 워크플로와 개선 권고 추적 | finding별 [예외 요청]/[오탐]/[조치 완료], 상태머신(Required→Requested→Approved/Rejected→Expired), owner/reason/expiry/approver, expired 예외 재평가, remediation 추적. 개선 권고·예외 검토 PDF export |
 
 ## Scan Profiles
 
@@ -88,6 +88,8 @@ CRD/bootstrap capability 부족 중 하나로 표시한다.
 | Scanner | SonarQube, Semgrep, gosec, Gitleaks, Trivy, Grype, Syft, Cosign, kube-linter, conftest, Hadolint, ShellCheck |
 | Scan status | Pass, Fail, Error, Skipped, Unsupported |
 | Exception status | None, Required, Requested, Approved, Expired, Rejected |
+| View preset | **OPEN(기본)** = 조치 필요(`scan_status IN (Fail,Error)` AND `exception_status IN (None,Required,Requested,Rejected,Expired)`). Approved 포함·전체 토글 가능. OPEN은 새 컬럼이 아니라 쿼리 프리셋이며 finding을 숨기지 않는다 |
+| Report domain / Target source | 6개 보안 도메인(category 프리셋) · Code/Artifact(`target_cluster IS NULL`) / Biz applied(`target_cluster IS NOT NULL`) / All |
 
 ## Cluster List
 
@@ -180,7 +182,6 @@ PostgreSQL이 query 정본이며, artifact store의 `manifest.json`은 `artifact
 | `assessment-api` | scan run, finding, exception, 최종 판정 결과 조회 |
 | `scanner-runner` | 검사 profile 실행 요청과 상태 추적 |
 | `artifact-store` | SBOM, scanner baseline, evidence bundle, exported report 저장 (raw report·normalized finding은 PostgreSQL) |
-| `exception-store` | 예외 승인 이력, 만료일, 승인자, 사유 저장 |
 
 ## State Model
 
@@ -190,7 +191,7 @@ PostgreSQL이 query 정본이며, artifact store의 `manifest.json`은 `artifact
 | ScanPhase | `artifactScan`, `clusterScan` 등 검사 절차별 phase, timestamps, conditions를 가진다. |
 | Finding | normalized finding. category, scanner, target, severity, status를 가진다. |
 | FinalDecision | scan run별 최종 판정 객체. `status`(Pass/Fail/Warning), `reasons[]`(code, message, severity, category, count, findingID), `decidedAt`로 구성하며 PLAN.md `FinalDecision` struct·`ScanRun.status.finalDecision`과 동일 스키마다. REST 목록/polling 응답의 `final_decision` 문자열은 이 객체의 status를 평면화한 값이다. |
-| ExceptionReview | finding별 예외 승인 상태, 승인자, 사유, 만료일. |
+| ExceptionReview | finding별 예외 승인 상태, 승인자, 사유, 만료일. MVP 정본은 per-finding `exception_reviews`(PostgreSQL); 예외 정책(패턴/scope 매칭)·`fingerprint`·`REVOKED`/`FALSE_POSITIVE`는 Phase2 plugin. |
 | Artifact | SBOM, digest verification report, scanner baseline, evidence bundle, exported report. raw report와 normalized finding은 PostgreSQL에서 조회한다. |
 | EvidenceBundle | raw report, normalized findings, scan health, final decision, exception candidates를 묶은 검수 증적. |
 
@@ -199,10 +200,12 @@ PostgreSQL이 query 정본이며, artifact store의 `manifest.json`은 `artifact
 - 최종 판정 실패 원인을 Overview에서 바로 보여준다.
 - 스캔 실패와 필수 산출물 누락은 취약점 없음으로 처리하지 않고 Scan Health에서 Fail로 표시한다.
 - Secret 원문 값은 UI, log, artifact 어디에도 표시하지 않는다.
-- Source & Secrets, Images & Integrity, Kubernetes Config & RBAC, Dockerfile & Scripts는 top-level
-  메뉴가 아니라 Findings 또는 Assessments 내부 탭으로 제공한다.
-- 예외 승인은 finding을 숨기지 않는다.
-  상태만 `Approved`로 바꾸고 만료일을 표시한다.
+- 6개 보안 도메인(소스 저장소/컨테이너 이미지/무결성·공급망/K8s 실행환경/스캔 상태·산출물)은 top-level
+  메뉴가 아니라 Findings 내부 탭으로 제공하고, `findings.category`+`target_cluster`(NULL=매니페스트, 값=applied) 프리셋 필터로 구분한다.
+- 예외 승인은 finding을 숨기지 않는다. 기본 Findings 뷰는 OPEN 프리셋(조치 필요)만 보이지만 이는 쿼리 필터일 뿐이며,
+  `Approved`/`Expired` finding도 DB·예외 관리 메뉴·상세·PDF·evidence에 그대로 유지된다(스캔 단계 제외·DB 삭제 없음). 상태만 `Approved`로 바꾸고 만료일을 표시한다.
+- 예외 관리는 finding별 [예외 요청]→`Requested` PATCH, [오탐]은 별도 enum이 아니라 reason 분류, [조치 완료]는 finding 삭제가 아니라 재스캔(`PATCH /scan-runs/{id}/retry`)으로 처리한다.
+  예외 정책 패턴 매칭·`fingerprint` 컬럼·`REVOKED`/`FALSE_POSITIVE` enum은 Phase2 plugin이다.
 - 개선 권고와 remediation은 보고서/추적 정보로만 제공한다.
   현재 버전 UI는 Biz Cluster 인프라 자동 수정 액션을 제공하지 않는다.
 - AI remediation advisor(선택)가 생성한 조치 가이드는 "AI generated / advisory / non-binding" 라벨과

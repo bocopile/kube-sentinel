@@ -356,6 +356,7 @@ Overview drill-down에서 제공한다.
 | `severity` | string[] (쉼표 구분) | `Critical,High,Medium,Low,Info` |
 | `exception_status` | string[] (쉼표 구분) | `None,Required,Requested,Approved,Expired,Rejected` |
 | `scan_status` | string[] (쉼표 구분) | `Pass,Fail,Error,Skipped,Unsupported` |
+| `view` | string | `open`(기본값)/`approved`/`all`. `open`은 dashboard 기본 프리셋으로 `scan_status IN (Fail,Error) AND exception_status IN (None,Required,Requested,Rejected,Expired)`를 적용한다. 새 컬럼이 아니라 쿼리 프리셋이며 명시적 `exception_status`/`scan_status` 필터가 오면 그쪽이 우선한다 |
 | `target_name` | string | 부분 일치 (`LIKE %value%`) |
 | `target_cluster` | string | 정확 일치. Biz applied finding의 ClusterTarget 이름 |
 | `namespace` | string | 정확 일치 |
@@ -711,6 +712,11 @@ Required → Requested → Approved → Expired
 
 재스캔으로 동일 `finding_id`가 새 ScanRun에 등장하면, 유효한 `Approved`(미만료)는 새 row로 carry-over하고
 `Expired`/`Rejected`는 `Required`로 재평가한다(상세는 DATABASE.md §exception_reviews 재스캔 carry-over 규칙).
+
+MVP UI는 finding별 버튼으로 이 흐름을 구동한다. `[예외 요청]`은 해당 finding의 `Required` row를 `Requested`로 전환하는
+finding-scoped 요청이며(`PATCH /api/v1/exceptions/{id}` 또는 finding_id 기준 생성), `[오탐]`은 별도 enum이 아니라
+예외 요청 `reason` 분류이고, `[조치 완료]`는 finding 삭제가 아니라 재스캔(`PATCH /scan-runs/{id}/retry`)으로 검증한다.
+예외 정책 패턴 매칭·`fingerprint` 자동 매칭·`REVOKED`/`FALSE_POSITIVE` enum은 Phase2 plugin이다.
 
 ### scan profiles enum
 

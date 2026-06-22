@@ -51,6 +51,10 @@
 | OTel/LGTM full telemetry | 최종점검 보고서의 source of truth가 아니므로 2차 export/observability 확장으로 둔다. |
 | Runtime event/drift assessment | 실시간 행위 탐지와 runtime drift는 현재 산출물 최종점검과 별도 버전으로 분리한다. |
 | Long-running DaemonSet sensor model | 1차는 read-only API inspection과 scan Job 중심이며 장수 센서는 2차 설계 후 도입한다. |
+| Exception policy 패턴/scope 매칭 (`exception_policies`) | MVP 예외 정본은 per-finding `exception_reviews`(finding_id별 개별 승인)다. 패턴(fingerprint/scanner+rule/location)·scope(Repo/Branch/Namespace/Workload/Image/CVE) 매칭으로 예외를 자동 분류하는 정책 모델은 과범위 승인·감사성 약화 위험이 커서 Phase2 plugin으로 둔다. 도입 시에도 `exception_reviews`를 대체하지 않고 review row를 생성/추천한다. |
+| `findings.fingerprint` 컬럼 + 자동 매칭 | MVP 중복/예외 carry-over 키는 deterministic `finding_id`다. 정책 매칭용 `fingerprint` generated column은 exception policy plugin 도입 시 추가한다. |
+| `REVOKED`/`FALSE_POSITIVE` 상태 확장 | MVP enum은 None/Required/Requested/Approved/Rejected/Expired. 오탐은 예외 요청 `reason` 분류로 기록하고, 철회는 수동 `Expired`/재신청으로 처리한다. 별도 enum은 Phase2. |
+| Kubescape Kubernetes scanner | MVP Kubernetes baseline은 kube-linter/conftest다. Kubescape는 CLI-only optional scanner plugin 후보로만 두며 installed controller 형태는 채택하지 않는다. |
 
 ## Trivy Operator VulnerabilityReport 정책
 
