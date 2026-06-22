@@ -308,7 +308,7 @@ docs/ROADMAP.md의 M3, Security Assessment feature를 구현한다.
 - finding normalization invocation.
 - scanner failure와 missing artifact에 대한 scan health reporting.
   reason enum: docs/DATABASE.md scan_health 테이블 참조.
-- artifact input manifest validation.
+- `SecurityAssessment.spec.artifactInput` validation 및 artifact input manifest validation.
 - scanner baseline capture → artifact_index 테이블 기록.
 
 optional inventory, Trivy delivery image scan, applied cluster configuration

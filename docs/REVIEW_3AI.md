@@ -38,6 +38,7 @@
 ## 2. HIGH — CRD/API 구현 계약 누락·미정의
 
 ### [I-3] CRD spec 필드 누락 다발 (Go 타입 ↔ YAML/API/prompt 불일치)
+> ✅ **해결됨** (3-AI 개별설계→교차검증→협의 후 적용): PLAN Go 타입에 `ClusterTargetSpec.BootstrapPolicy`, `SecurityAssessmentSpec.ArtifactInput`(구조화 sub-type)·`AIRemediation`(typed), `ScanRunSpec.Profiles` 추가. API `POST /scan-runs`에 `targets` override 추가. ConfigMapKeyRef 같은 미정의 타입은 회피.
 - **병합**: C2 + X5 + C8 + U7 + U5 — 전부 만장일치 confirmed
 - **누락 목록**:
   - `SecurityAssessmentSpec.aiRemediation` — AI_REMEDIATION/PROMPTS P11이 전제하나 Go 타입에 없음 (C2)
@@ -48,6 +49,7 @@
 - **합의 권고**: PLAN(및 ARCHITECTURE) 핵심 Go 타입에 위 필드를 일괄 추가하고 YAML 샘플·API·prompt와 동기화. P0 skeleton 생성 전 필수.
 
 ### [I-4] ScanRun/SecurityAssessment status 모델 불일치
+> ✅ **해결됨** (3-AI 협의 후 적용): PLAN에 `FinalDecision` struct(status/reasons[]/decidedAt)·`FinalDecisionReason`·`ScanRunStatus.RemoteResources[]`(+Feature/Scope/SpecHash)·신규 `SecurityAssessmentStatus` 정의. REST `final_decision`은 status projection(string) 유지, CRD/FRONTEND는 object — 3자 동일 스키마로 정렬. DATABASE 무변경(주석만 보강).
 - **병합**: C6 + U9 — 만장일치 confirmed
 - **근거**: PLAN `ScanRunStatus`에 `Canceled` phase·`remoteResources[]` 없음, `SecurityAssessmentStatus` 타입 자체 부재. ARCHITECTURE(status.remoteResources[], lastRunRef)·DATABASE·API는 포함. `finalDecision`이 string인지 object인지도 문서마다 다름(API string ↔ FRONTEND `finalDecision.status`).
 - **합의 권고**: `FinalDecision` struct(`status`,`reasons[]`,`decidedAt`)와 `ScanRunStatus`/`SecurityAssessmentStatus`를 ARCHITECTURE 기준으로 PLAN에 확정, API 응답·FRONTEND state model 동일 스키마로 정렬.

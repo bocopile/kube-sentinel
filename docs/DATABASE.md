@@ -44,14 +44,19 @@ CREATE TABLE scan_runs (
     phase                VARCHAR(50)  NOT NULL,          -- Pending | Running | Completed | Failed | Canceled
     artifact_scan_phase  VARCHAR(50),                   -- Pending | Running | Completed | Failed | Skipped
     cluster_scan_phase   VARCHAR(50),                   -- Pending | Running | Completed | Failed | Skipped
-    final_decision       VARCHAR(50),                   -- Pass | Fail | Warning
+    final_decision       VARCHAR(50),                   -- Pass | Fail | Warning (= summary.final_decision.status projection, 필터/인덱스용)
     summary              JSONB        NOT NULL DEFAULT '{}',
     -- {
     --   "critical_count": 0,
     --   "high_count": 0,
     --   "exception_required_count": 0,
     --   "scan_health_fail_count": 0,
-    --   "scanner_baseline_date": "2026-06-18"
+    --   "scanner_baseline_date": "2026-06-18",
+    --   "final_decision": {        -- security.finalDecision/v1 object snapshot
+    --     "status": "Fail",
+    --     "reasons": [ { "code": "critical_finding", "severity": "Critical", "count": 3 } ],
+    --     "decided_at": "2026-06-18T12:00:00Z"
+    --   }
     -- }
     created_at           TIMESTAMPTZ  NOT NULL DEFAULT now(),
     started_at           TIMESTAMPTZ,

@@ -715,7 +715,7 @@ Recommended formats:
 | Normalized findings | `security.finding/v1` JSON Schema, one row per finding | PostgreSQL `findings` | severity, category, scanner, namespace, exception_status 필터 및 집계. |
 | Finding index | PostgreSQL rows with indexed columns plus `details JSONB` | PostgreSQL `findings` | Fast dashboard filters. |
 | Scan health | PostgreSQL row + `details JSONB` | PostgreSQL `scan_health` | Scanner failure and missing-artifact states must be queryable. |
-| Final decision | `security.finalDecision/v1`, JSONB in `scan_runs.summary` | PostgreSQL `scan_runs` | Pass/Fail/Warning and counters queryable without join. |
+| Final decision | `security.finalDecision/v1` object `{status, reasons[], decidedAt}`, JSONB snapshot in `scan_runs.summary`; `status` is projected to the `scan_runs.final_decision` column | PostgreSQL `scan_runs` | Pass/Fail/Warning, failure reasons, and counters queryable without join. |
 | Exception review | PostgreSQL rows + status machine | PostgreSQL `exception_reviews` | Queryable by status, expiry, owner. |
 | SBOM | CycloneDX JSON; SPDX JSON accepted | Artifact Store | 수 MB 표준 포맷 파일. digest 기준 경로로 저장. |
 | Image digest/signature report | `security.imageIntegrity/v1` JSON | Artifact Store + `artifact_index` row | digest, verification result, key reference. |
@@ -944,6 +944,7 @@ separately.
 - `status.observedGeneration`
 - `status.lastRunRef`
 - `status.summary`
+- `status.conditions[]`
 
 Feature status reasons should include:
 

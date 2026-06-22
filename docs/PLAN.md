@@ -216,6 +216,19 @@ spec:
     - KubernetesConfig
     - RBACAndSecretReference
     - BuildAndDeploy
+  artifactInput:
+    sourceRef:
+      path: ./release-src
+    imageList:
+      - image: registry.example.com/app/api:1.2.3
+    digestList:
+      - image: registry.example.com/app/api
+        digest: sha256:...
+    manifestRef:
+      path: ./deploy/rendered
+  aiRemediation:
+    enabled: false
+    provider: none
   features:
     - name: trivy
       enabled: true
@@ -245,19 +258,77 @@ type ClusterTargetSpec struct {
     NamespaceAllowlist []string            `json:"namespaceAllowlist,omitempty"`
     Output             TargetOutputSpec    `json:"output,omitempty"`
     Capabilities       TargetCapabilitySpec `json:"capabilities,omitempty"`
+    BootstrapPolicy    ClusterTargetBootstrapPolicy `json:"bootstrapPolicy,omitempty"`
+}
+
+// ClusterTargetBootstrapPolicy는 preflight에서 누락으로 판정된 항목 중
+// Mgmt operator가 자동 설치/연결해도 되는 범위를 선언한다. 명시되지 않은
+// 항목은 설치하지 않고 '설치 필요' 상태로만 표시한다.
+type ClusterTargetBootstrapPolicy struct {
+    InstallMissingNamespace  bool            `json:"installMissingNamespace,omitempty"`
+    InstallManagedRBAC       bool            `json:"installManagedRBAC,omitempty"`
+    InstallScannerResources  bool            `json:"installScannerResources,omitempty"`
+    AttachImagePullSecretRef *LocalObjectRef `json:"attachImagePullSecretRef,omitempty"`
 }
 
 type SecurityAssessmentSpec struct {
-    Targets  []string      `json:"targets"`
-    Profiles []ScanProfile `json:"profiles,omitempty"`
-    Features []FeatureSpec `json:"features,omitempty"`
-    Output        OutputSpec        `json:"output,omitempty"`
-    ScanResources *ScanResourceSpec `json:"scanResources,omitempty"`
+    Targets       []string           `json:"targets"`
+    Profiles      []ScanProfile      `json:"profiles,omitempty"`
+    ArtifactInput *ArtifactInputSpec `json:"artifactInput,omitempty"`
+    AIRemediation *AIRemediationSpec `json:"aiRemediation,omitempty"`
+    Features      []FeatureSpec      `json:"features,omitempty"`
+    Output        OutputSpec         `json:"output,omitempty"`
+    ScanResources *ScanResourceSpec  `json:"scanResources,omitempty"`
+}
+
+// ArtifactInputSpec은 납품 산출물 입력(artifact-input manifest)을 CRD에 연결한다.
+// 실제 재현 선언(artifact-input.yaml)은 Artifact Store에 보관하고 CRD에는
+// 입력 위치/목록 참조만 둔다. 대용량 원문은 CRD에 인라인하지 않는다.
+type ArtifactInputSpec struct {
+    SourceRef   *ArtifactLocationRef `json:"sourceRef,omitempty"`   // source/Dockerfile/Helm/YAML/RBAC/script 위치
+    ImageList   []ImageArtifactRef   `json:"imageList,omitempty"`   // 납품 대상 image 목록
+    DigestList  []ImageDigestRef     `json:"digestList,omitempty"`  // 승인 digest 기준 목록
+    ManifestRef *ArtifactLocationRef `json:"manifestRef,omitempty"` // 외부 artifact-input.yaml 위치
+}
+
+type ArtifactLocationRef struct {
+    Path              string `json:"path,omitempty"`
+    ArtifactStorePath string `json:"artifactStorePath,omitempty"`
+    Checksum          string `json:"checksum,omitempty"`
+}
+
+type ImageArtifactRef struct {
+    Image   string `json:"image"`
+    Digest  string `json:"digest,omitempty"`
+    TarPath string `json:"tarPath,omitempty"`
+}
+
+type ImageDigestRef struct {
+    Image  string `json:"image"`
+    Digest string `json:"digest"`
+}
+
+// AIRemediationSpec은 AI 조치 가이드 advisor(선택, 기본 OFF) opt-in 설정이다.
+// 상세 기준은 AI_REMEDIATION.md를 따른다. RawExtension이 아니라 strongly-typed로
+// 두어 egress/redaction/판정 안전성 필드를 CRD schema에서 직접 검증한다.
+type AIRemediationSpec struct {
+    Enabled               bool          `json:"enabled"`                       // 기본 OFF, ON은 명시적 opt-in
+    Provider              string        `json:"provider,omitempty"`            // gemini | none
+    APIKeySecretRef       *SecretKeyRef `json:"apiKeySecretRef,omitempty"`     // Mgmt Cluster Secret 참조 (값 미노출)
+    Model                 string        `json:"model,omitempty"`               // version pin
+    PromptTemplateID      string        `json:"promptTemplateID,omitempty"`    // PROMPTS.md 등록 template 버전
+    SeverityFilter        []string      `json:"severityFilter,omitempty"`      // [Critical, High]
+    CategoryAllowlist     []string      `json:"categoryAllowlist,omitempty"`   // [kubernetes, rbac, dockerfile, image_vulnerability]
+    MaxFindingsPerScan    int32         `json:"maxFindingsPerScan,omitempty"`  // per-scan 상한
+    RequestTimeoutSeconds int32         `json:"requestTimeoutSeconds,omitempty"`
+    MaxConcurrency        int32         `json:"maxConcurrency,omitempty"`
+    RedactionProfile      string        `json:"redactionProfile,omitempty"`    // strict 등
 }
 
 type ScanRunSpec struct {
     AssessmentRef LocalObjectRef `json:"assessmentRef"`
     Targets       []string       `json:"targets,omitempty"`
+    Profiles      []ScanProfile  `json:"profiles,omitempty"` // 생략 시 SecurityAssessment.spec.profiles 사용
 }
 
 // RawExtension → 스키마 변경 없이 새 도구 config 추가 가능
@@ -292,13 +363,47 @@ type ClusterTargetStatus struct {
 }
 
 type ScanRunStatus struct {
-    ObservedGeneration int64              `json:"observedGeneration,omitempty"`
-    Phase              string             `json:"phase,omitempty"` // Pending, Running, Completed, Failed
-    ArtifactScan       ScanPhaseStatus    `json:"artifactScan,omitempty"`
-    ClusterScan        ScanPhaseStatus    `json:"clusterScan,omitempty"`
-    Features           []FeatureCondition `json:"features,omitempty"`
-    Targets            []TargetRunStatus  `json:"targets,omitempty"`
-    FinalDecision      FinalDecision      `json:"finalDecision,omitempty"`
+    ObservedGeneration int64               `json:"observedGeneration,omitempty"`
+    Phase              string              `json:"phase,omitempty"` // Pending, Running, Completed, Failed, Canceled
+    ArtifactScan       ScanPhaseStatus     `json:"artifactScan,omitempty"`
+    ClusterScan        ScanPhaseStatus     `json:"clusterScan,omitempty"`
+    Features           []FeatureCondition  `json:"features,omitempty"`
+    Targets            []TargetRunStatus   `json:"targets,omitempty"`
+    RemoteResources    []RemoteResourceRef `json:"remoteResources,omitempty"`
+    FinalDecision      *FinalDecision      `json:"finalDecision,omitempty"`
+}
+
+// FinalDecision은 최종 판정을 단일 enum이 아니라 status + 근거로 표현한다.
+// status는 scanner exit code 하나가 아니라 필수 산출물/분석 실패/예외 승인
+// 상태를 함께 평가한 결과다. REST API는 이 객체의 status를 `final_decision`
+// 문자열(snake_case)로 평면화해 노출하고, 전체 객체는 evidence/summary로 보존한다.
+type FinalDecision struct {
+    Status    string                `json:"status,omitempty"` // Pass, Fail, Warning
+    Reasons   []FinalDecisionReason `json:"reasons,omitempty"`
+    DecidedAt metav1.Time           `json:"decidedAt,omitempty"`
+}
+
+type FinalDecisionReason struct {
+    Code      string `json:"code"`                 // critical_finding, secret_exposure, digest_mismatch, missing_artifact, unapproved_exception 등
+    Message   string `json:"message,omitempty"`
+    Severity  string `json:"severity,omitempty"`   // Critical, High, ...
+    Category  string `json:"category,omitempty"`   // findings.category
+    Count     int32  `json:"count,omitempty"`
+    FindingID string `json:"findingID,omitempty"`  // 연결 finding (있으면)
+}
+
+// RemoteResourceRef는 Biz Cluster에 remote apply된 리소스를 추적한다.
+// Remote object는 Mgmt CR에 ownerReference를 걸 수 없으므로
+// label(target/feature/scope)과 spec-hash annotation 기준으로만 GC한다.
+type RemoteResourceRef struct {
+    Target     string `json:"target"`             // ClusterTarget 이름
+    APIVersion string `json:"apiVersion"`
+    Kind       string `json:"kind"`
+    Namespace  string `json:"namespace,omitempty"`
+    Name       string `json:"name"`
+    Feature    string `json:"feature,omitempty"`  // security.kube-sentinel.io/feature
+    Scope      string `json:"scope,omitempty"`    // target | run
+    SpecHash   string `json:"specHash,omitempty"` // security.kube-sentinel.io/spec-hash
 }
 
 type ScanPhaseStatus struct {
@@ -316,6 +421,25 @@ type FeatureCondition struct {
     Message            string      `json:"message,omitempty"`
     ObservedGeneration int64       `json:"observedGeneration,omitempty"`
     LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+}
+
+// SecurityAssessmentStatus는 마지막 실행 기준 집계로 dashboard Overview/Assessments
+// read model 입력이다. summary 카운터는 DATABASE scan_runs.summary JSONB와 동일 의미다.
+type SecurityAssessmentStatus struct {
+    ObservedGeneration int64              `json:"observedGeneration,omitempty"`
+    LastRunRef         *LocalObjectRef    `json:"lastRunRef,omitempty"` // 가장 최근 ScanRun 참조
+    Summary            AssessmentSummary  `json:"summary,omitempty"`
+    Conditions         []metav1.Condition `json:"conditions,omitempty"`
+}
+
+type AssessmentSummary struct {
+    LastDecision           string      `json:"lastDecision,omitempty"` // Pass, Fail, Warning
+    CriticalCount          int32       `json:"criticalCount,omitempty"`
+    HighCount              int32       `json:"highCount,omitempty"`
+    ExceptionRequiredCount int32       `json:"exceptionRequiredCount,omitempty"`
+    ScanHealthFailCount    int32       `json:"scanHealthFailCount,omitempty"`
+    ScannerBaselineDate    string      `json:"scannerBaselineDate,omitempty"`
+    LastRunAt              metav1.Time `json:"lastRunAt,omitempty"`
 }
 ```
 

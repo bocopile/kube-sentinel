@@ -188,7 +188,7 @@ Code / Artifact 실패와 Biz Cluster 실패를 같은 실패로 보지 않고, 
 | ScanRun | 한 번의 검사 실행 단위. profile, target version, status, timestamps를 가진다. |
 | ScanPhase | `artifactScan`, `clusterScan` 등 검사 절차별 phase, timestamps, conditions를 가진다. |
 | Finding | normalized finding. category, scanner, target, severity, status를 가진다. |
-| FinalDecision | scan run별 최종 Pass/Fail/Warning 판정과 주요 실패 원인 목록. |
+| FinalDecision | scan run별 최종 판정 객체. `status`(Pass/Fail/Warning), `reasons[]`(code, message, severity, category, count, findingID), `decidedAt`로 구성하며 PLAN.md `FinalDecision` struct·`ScanRun.status.finalDecision`과 동일 스키마다. REST 목록/polling 응답의 `final_decision` 문자열은 이 객체의 status를 평면화한 값이다. |
 | ExceptionReview | finding별 예외 승인 상태, 승인자, 사유, 만료일. |
 | Artifact | SBOM, digest verification report, scanner baseline, evidence bundle, exported report. raw report와 normalized finding은 PostgreSQL에서 조회한다. |
 | EvidenceBundle | raw report, normalized findings, scan health, final decision, exception candidates를 묶은 검수 증적. |

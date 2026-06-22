@@ -225,6 +225,7 @@ ScanRun CR을 생성해 scan을 트리거한다. 내부적으로 k8s API에 Scan
 ```json
 {
   "assessment_name": "final-check-20260618",
+  "targets": ["biz-a", "biz-b"],
   "profiles": ["SourceSecurity", "ImageSupplyChain", "KubernetesConfig"]
 }
 ```
@@ -232,7 +233,8 @@ ScanRun CR을 생성해 scan을 트리거한다. 내부적으로 k8s API에 Scan
 | 필드 | 형식 | 필수 | 설명 |
 |------|------|------|------|
 | `assessment_name` | string | ✓ | 연결할 SecurityAssessment 이름 |
-| `profiles` | string[] | | override scan profile list. 생략 시 SecurityAssessment 기본값 사용 |
+| `targets` | string[] | | override 검사 대상 ClusterTarget 이름 목록. `ScanRun.spec.targets`에 매핑되며 생략 시 SecurityAssessment.spec.targets 사용 |
+| `profiles` | string[] | | override scan profile list. `ScanRun.spec.profiles`에 매핑되며 생략 시 SecurityAssessment 기본값 사용 |
 
 **응답 `201`:**
 
@@ -245,7 +247,7 @@ ScanRun CR을 생성해 scan을 트리거한다. 내부적으로 k8s API에 Scan
 }
 ```
 
-**응답 `400`:** assessment_name 없음 또는 profiles enum 오류.
+**응답 `400`:** assessment_name 없음, targets 참조 오류 또는 profiles enum 오류.
 
 ---
 
@@ -273,7 +275,7 @@ phase 폴링용 경량 엔드포인트. frontend는 5초마다 호출한다.
 }
 ```
 
-`final_decision`은 `phase = Completed`일 때만 non-null.
+`final_decision`은 `phase = Completed`일 때만 non-null이며, `ScanRun.status.finalDecision.status`(`Pass`/`Fail`/`Warning`)를 평면화한 문자열(DATABASE `scan_runs.final_decision`과 동일)이다. 실패 근거 목록(`finalDecision.reasons[]`)은 이 경량 polling 응답에 포함하지 않고 `GET /api/v1/scan-runs/{id}` 및 Overview drill-down에서 제공한다.
 
 ---
 
