@@ -133,7 +133,7 @@ Code / Artifact Scan 결과와 분리된 cluster scan health로 기록한다.
 ## Assessment Workflows
 
 워크플로우 문서는 검사 그룹별로 분리한다. 하나의 `Full Final Check`는 두
-워크플로우를 순차 실행하지만, 각 워크플로우는 독립 실행, 재실행, 실패
+워크플로우를 순차 실행하지만, 각 워크플로우는 독립 실행, 재실행(`PATCH /api/v1/scan-runs/{id}/retry`의 `scope`: `Full`/`ArtifactOnly`/`ClusterOnly`/`FinalDecisionOnly`로 같은 ScanRun의 선택 phase만 갱신), 실패
 분석이 가능해야 한다.
 
 ### Code / Artifact Workflow

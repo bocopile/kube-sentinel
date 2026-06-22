@@ -161,7 +161,7 @@ backend/
     ├── handler/
     │   ├── overview.go                  # GET /api/v1/overview
     │   ├── cluster_targets.go           # GET /api/v1/cluster-targets
-    │   ├── scan_runs.go                 # GET/POST /api/v1/scan-runs
+    │   ├── scan_runs.go                 # GET/POST /api/v1/scan-runs, PATCH /api/v1/scan-runs/{id}/retry (retry-scope annotation patch)
     │   ├── findings.go                  # GET /api/v1/scan-runs/{id}/findings
     │   ├── scan_health.go               # GET /api/v1/scan-runs/{id}/health
     │   ├── exceptions.go                # GET/PATCH /api/v1/exceptions

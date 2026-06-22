@@ -73,6 +73,7 @@
 - **합의 권고**: PLAN enum에 `secret_ref`,`network` 추가하여 DATABASE와 일치.
 
 ### [I-8] finding_id 생성 규칙 불완전·충돌 (dedup 신뢰성)
+> ✅ **해결됨** (3-AI 협의 후 적용): DATABASE를 단일 정본으로, `image_vulnerability`에 `<scanner>` prefix(Trivy CLI/Operator 모두 scanner=trivy 정규화), `kubernetes`/`rbac`을 Code/Artifact manifest(`_artifact`)/Biz applied(`<clusterTarget>`)로 분리, `sbom`(`<purl>`)·`integrity`·`secret_ref`·`network` 규칙 신설, cluster-scoped=`_cluster`. `findings.target_cluster` 컬럼+인덱스 추가. PLAN/API 예시 정렬.
 - **병합**: C1 + X8 + U8(refined)
   - `image_vulnerability` 규칙에 `<scanner>` prefix 없음 → Trivy/Grype 동일 이미지·CVE·패키지가 `UNIQUE(finding_id, scan_run_id)` 충돌. 게다가 API_DESIGN 예시는 `trivy/…`로 **규칙-예시 자기모순** (C1)
   - `kubernetes`/`rbac` 규칙에 cluster/target 식별자 없음 → 다중 Biz Cluster 동일 리소스 충돌 (X8)
@@ -80,6 +81,7 @@
 - **합의 권고**: DATABASE finding_id 표를 `<scanner>/…`로 통일 + 다중 target 시 cluster 식별자 포함 + 누락 category 규칙 보강(또는 기존 규칙 재사용 명시). API 예시·PLAN 예시를 규칙과 일치.
 
 ### [I-9] workflow 독립 재실행(retry/resume) 트리거 미정의
+> ✅ **해결됨** (3-AI 협의 후 적용): `PATCH /api/v1/scan-runs/{id}/retry`(scope: Full|ArtifactOnly|ClusterOnly|FinalDecisionOnly) 신설. 메커니즘은 spec 필드가 아니라 **metadata annotation patch**(`security.kube-sentinel.io/retry-scope`)로 k8s 관례 준수 — reconciler가 선택 phase만 Pending 후 재실행, annotation observed 처리. reconcile flow는 번호 보존(ARCHITECTURE 5.5 / PLAN step13 분기). FRONTEND 재실행 버튼·SECURITY workflows 정렬, 재실행 시 finding_id 멱등 upsert(I-8).
 - **출처/검증**: U3 — confirmed(refined)
 - **근거**: SECURITY_ASSESSMENT "각 workflow는 독립 재실행 가능", FRONTEND "Code/Artifact Scan만 재실행" 요구. 그러나 `POST /scan-runs`는 신규 생성만, ScanRun spec에 rerun scope/resume 필드·reconciler 진입점 없음. (ScanRun.status가 artifactScan/clusterScan phase는 분리 관리 → 재실행 단위 모델 일부 존재.)
 - **합의 권고**: `ScanRun.spec.rerunScope`(Full|ArtifactOnly|ClusterOnly|FinalDecisionOnly) 또는 `PATCH /scan-runs/{id}/retry` 정의 + reconciler 분기 추가.

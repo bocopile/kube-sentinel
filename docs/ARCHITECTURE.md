@@ -568,6 +568,7 @@ umbrella 명칭·registry feature ID·profile 매핑 표 어디에도 없는 `fe
 5. `profiles[]`를 매핑 정본 표로 base set으로 확장하고 `features[]`(enable/disable·config override)와
    병합해 enabled feature를 deterministic하게 resolve한 뒤, priority → feature ID 사전순으로 정렬한다.
    unknown profile/feature는 `ConfigError`로 기록하고 제외한다.
+5.5. ScanRun `metadata.annotations`의 `security.kube-sentinel.io/retry-scope`(backend `PATCH /api/v1/scan-runs/{id}/retry`가 patch)가 있으면 부분 재실행 분기로 진입한다. `ArtifactOnly`는 `status.artifactScan`만, `ClusterOnly`는 `status.clusterScan`만 `Pending`으로 되돌리고 나머지 phase·이미 저장된 finding은 보존한다. `FinalDecisionOnly`는 두 scan phase를 재실행하지 않고 상관 분석/finalDecision 재계산만 수행한다. `Full` 또는 annotation 없음(최초 생성)은 전체 phase를 실행한다. 재실행으로 생성된 finding은 `findings`에 finding_id 기준 멱등 upsert되며(I-8 규칙), reconcile 완료 후 reconciler가 retry-scope annotation을 observed 처리(clear)한다.
 6. feature별 `Validate()`를 실행한다.
 7. feature별 `Preflight()`를 실행해 target 환경 실패를 scanner finding과 분리한다.
 8. bootstrap 정책상 허용된 누락 항목만 `Build()` 결과에 포함한다.

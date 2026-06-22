@@ -61,6 +61,7 @@ list 엔드포인트는 offset/limit 기반 페이지네이션을 사용한다.
 | GET | `/api/v1/cluster-targets/{name}` | ClusterTarget 단건 |
 | GET | `/api/v1/scan-runs` | ScanRun 목록 |
 | POST | `/api/v1/scan-runs` | ScanRun 생성 (trigger) |
+| PATCH | `/api/v1/scan-runs/{id}/retry` | ScanRun workflow 부분 재실행 (trigger) |
 | GET | `/api/v1/scan-runs/{id}` | ScanRun 단건 |
 | GET | `/api/v1/scan-runs/{id}/status` | phase 폴링 (5초 주기) |
 | GET | `/api/v1/scan-runs/{id}/findings` | finding 목록 (필터/페이지) |
@@ -251,6 +252,53 @@ ScanRun CR을 생성해 scan을 트리거한다. 내부적으로 k8s API에 Scan
 
 ---
 
+### PATCH /api/v1/scan-runs/{id}/retry
+
+기존 ScanRun 안에서 선택 workflow만 재실행한다. 새 ScanRun을 만들지 않고 동일 id의 phase/finalDecision을 갱신한다. backend는 `ScanRun.spec`을 변경하지 않고 ScanRun `metadata.annotations`에 `security.kube-sentinel.io/retry-scope`(+ `retry-request-id`/`retry-requested-at`)를 patch하며, operator reconciler가 선택 phase만 재실행한 뒤 annotation을 observed 처리한다.
+
+**요청 body:**
+
+```json
+{
+  "scope": "ArtifactOnly",
+  "reason": "registry pull failure resolved"
+}
+```
+
+| 필드 | 형식 | 필수 | 설명 |
+|------|------|------|------|
+| `scope` | string (enum) | ✓ | `Full`, `ArtifactOnly`, `ClusterOnly`, `FinalDecisionOnly` |
+| `reason` | string | | audit용 사유. retry-request annotation/status condition에 기록 |
+
+scope 동작:
+
+| `scope` | 재실행 대상 | 보존 |
+|---|---|---|
+| `Full` | Code / Artifact Scan + Biz Cluster Scan 전체 + 재판정 | — |
+| `ArtifactOnly` | Code / Artifact Scan(Mgmt-local Job)만 + 재판정 | 기존 `cluster_scan_phase`·cluster finding |
+| `ClusterOnly` | Biz Cluster Scan(read-only + optional Biz-remote Job)만 + 재판정 | 기존 `artifact_scan_phase`·artifact finding |
+| `FinalDecisionOnly` | scan 재실행 없이 `finalDecision`만 재계산 | 두 scan phase finding 그대로 사용 |
+
+**응답 `202`:**
+
+```json
+{
+  "id": "scanrun-abc123",
+  "scope": "ArtifactOnly",
+  "phase": "Running",
+  "artifact_scan_phase": "Pending",
+  "cluster_scan_phase": "Completed"
+}
+```
+
+**응답 `400`:** `scope` 누락 또는 enum 형식 오류.
+**응답 `404`:** ScanRun 없음.
+**응답 `409`:** 해당 ScanRun이 `Canceled`이거나 선택 workflow가 이미 `Running`(이전 retry-scope annotation이 아직 observed 처리되지 않음).
+
+재실행으로 생성/갱신되는 finding은 PostgreSQL `findings`에 finding_id 기준 멱등 upsert되어 중복 집계되지 않는다(raw 정본=PostgreSQL, dedup 규칙은 DATABASE.md §findings).
+
+---
+
 ### GET /api/v1/scan-runs/{id}
 
 단건. list items와 동일 스키마.
@@ -290,6 +338,7 @@ phase 폴링용 경량 엔드포인트. frontend는 5초마다 호출한다.
 | `exception_status` | string[] (쉼표 구분) | `None,Required,Requested,Approved,Expired,Rejected` |
 | `scan_status` | string[] (쉼표 구분) | `Pass,Fail,Error,Skipped,Unsupported` |
 | `target_name` | string | 부분 일치 (`LIKE %value%`) |
+| `target_cluster` | string | 정확 일치. Biz applied finding의 ClusterTarget 이름 |
 | `namespace` | string | 정확 일치 |
 | `scanner` | string | 정확 일치 |
 | `offset` | int | |
@@ -311,6 +360,7 @@ phase 폴링용 경량 엔드포인트. frontend는 5초마다 호출한다.
       "severity": "Critical",
       "target_type": "image",
       "target_name": "registry.example.com/app:latest",
+      "target_cluster": null,
       "namespace": "default",
       "image_digest": "sha256:abc123...",
       "rule_id": "CVE-2024-1234",

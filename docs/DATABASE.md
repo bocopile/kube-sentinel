@@ -123,7 +123,10 @@ scanner별 `format` 값:
 ### findings
 
 normalized finding. `finding_id`는 scanner + target + rule 조합의 deterministic
-stable ID. `exception_status`는 `exception_reviews`와 sync해 join 없이 필터 가능하다.
+stable ID이며 생성 규칙은 아래 표가 단일 정본이다(category별 구성 요소가 다르다). 같은
+report를 2회 처리하거나 같은 workflow를 재실행해도 동일 finding_id로 멱등 upsert되어
+`UNIQUE (finding_id, scan_run_id)` 기준 중복 집계가 발생하지 않는다(M5 dedup).
+`exception_status`는 `exception_reviews`와 sync해 join 없이 필터 가능하다.
 
 ```sql
 CREATE TABLE findings (
@@ -137,8 +140,9 @@ CREATE TABLE findings (
     -- sast | secret | image_vulnerability | sbom | integrity | kubernetes
     -- rbac | secret_ref | network | dockerfile | script | scan_health
     severity           VARCHAR(50)  NOT NULL CHECK (severity IN ('Critical','High','Medium','Low','Info')),
-    target_type        VARCHAR(100),                   -- source | image | helm | yaml | dockerfile | script | rbac | secret_ref
+    target_type        VARCHAR(100),                   -- source | image | helm | yaml | dockerfile | script | kubernetes | rbac | secret_ref | network
     target_name        TEXT,                           -- 파일 경로, 이미지 ref, k8s resource name
+    target_cluster     VARCHAR(255),                   -- Biz applied finding의 ClusterTarget 이름. Code / Artifact finding은 NULL
     namespace          VARCHAR(255),
     image_digest       VARCHAR(255),                   -- sha256:...
     rule_id            VARCHAR(255),                   -- CVE ID, semgrep rule ID, policy ID
@@ -159,19 +163,32 @@ CREATE INDEX idx_findings_scan_run     ON findings(scan_run_id);
 CREATE INDEX idx_findings_filter       ON findings(scan_run_id, category, severity, exception_status, scan_status);
 CREATE INDEX idx_findings_digest       ON findings(image_digest) WHERE image_digest IS NOT NULL;
 CREATE INDEX idx_findings_namespace    ON findings(namespace)    WHERE namespace IS NOT NULL;
+CREATE INDEX idx_findings_target_cluster ON findings(target_cluster) WHERE target_cluster IS NOT NULL;
 CREATE INDEX idx_findings_raw_report   ON findings(raw_report_id);
 CREATE INDEX idx_findings_details_gin  ON findings USING GIN (details) WHERE details IS NOT NULL;
 ```
 
-finding_id 생성 규칙:
+finding_id 생성 규칙 (DATABASE가 단일 정본. PLAN/API_DESIGN 예시는 이 표를 따른다):
 
 | category | 구성 요소 |
 |----------|----------|
-| `image_vulnerability` | `<imageRepository>/<imageDigest>/<vulnerabilityID>/<packageName>` |
+| `image_vulnerability` | `<scanner>/<imageRepository>/<imageDigest>/<vulnerabilityID>/<packageName>` |
+| `sbom` | `<scanner>/<imageRepository>/<imageDigest>/<purl>` |
+| `integrity` | `<scanner>/<imageDigest>/<verificationType>` |
 | `sast`, `secret` | `<scanner>/<filePath>/<ruleID>/<lineHash>` |
-| `kubernetes`, `rbac` | `<scanner>/<namespace>/<resourceKind>/<resourceName>/<ruleID>` |
-| `dockerfile`, `script` | `<scanner>/<filePath>/<ruleID>/<lineHash>` |
+| `dockerfile`, `script` | `<scanner>/<filePath>/<ruleID>/<lineHash>` (sast/secret 규칙 재사용) |
+| `kubernetes`, `rbac` (Code / Artifact manifest) | `<scanner>/_artifact/<filePathHash>/<namespaceOr_cluster>/<resourceKind>/<resourceName>/<ruleID>` |
+| `kubernetes`, `rbac` (Biz applied) | `<scanner>/<clusterTarget>/<namespaceOr_cluster>/<resourceKind>/<resourceName>/<ruleID>` |
+| `secret_ref`, `network` | `<scanner>/<clusterTarget>/<namespace>/<resourceKind>/<resourceName>/<ruleID>` |
 | `scan_health` | `scan_health/<scanRunID>/<scanner>/<errorCode>` |
+
+규칙 메모:
+- `<scanner>`는 `findings.scanner` 정규화 값이다. Trivy CLI 직접 image scan과 Trivy Operator `VulnerabilityReport` ingestion은 둘 다 `scanner=trivy`로 정규화해, 입력 경로가 달라도 동일 이미지·CVE·패키지가 같은 finding_id가 되어 dedup된다. Grype는 `grype`. 따라서 같은 이미지·CVE를 Trivy와 Grype가 모두 보고하면 finding_id가 달라 `UNIQUE (finding_id, scan_run_id)` 충돌 없이 둘 다 기록된다.
+- `<clusterTarget>`는 `ScanRun.spec.targets[]`의 ClusterTarget `metadata.name`(display name 아님)이며 `findings.target_cluster` 컬럼에도 저장한다. 한 ScanRun이 여러 Biz Cluster target을 검사할 때 동일 namespace/resource/rule이 target 간 충돌하지 않도록 한다. Code / Artifact Scan(Mgmt-local, target 비종속)의 manifest finding은 `_artifact` + `<filePathHash>`를 사용하고 `target_cluster`는 NULL이다.
+- cluster-scoped 리소스(ClusterRole, ClusterRoleBinding 등 namespace 없음)는 `<namespaceOr_cluster>` 자리에 리터럴 `_cluster`를 쓴다.
+- `<verificationType>`은 `digest_mismatch`, `signature_invalid`, `sbom_missing` 등 무결성 점검 코드다.
+- finding_id는 `VARCHAR(512)` 한계 안에 인코딩한다. target+namespace+kind+name 조합이 길면 normalizer가 각 segment 길이를 제한하거나 초과분을 hash로 축약한다.
+- 동일 `(finding_id, scan_run_id)`는 멱등 upsert되어 중복 집계되지 않는다(M5 dedup). 원본 scanner 출력은 `raw_reports`에 보존한다.
 
 ---
 

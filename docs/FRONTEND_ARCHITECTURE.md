@@ -163,9 +163,11 @@ store의 stable path를 참조해 다운로드한다. PostgreSQL이 query 정본
 
 | Workflow | UI 상태 | 대표 실패 원인 | 재실행 단위 |
 |----------|---------|----------------|-------------|
-| Code / Artifact Workflow | `artifactScan.phase` | missing artifact, artifactInput checksum mismatch, scanner error, stale DB/rule, registry pull failure, digest mismatch | Code / Artifact Scan만 재실행 (Mgmt-local Job) |
-| Biz Cluster Workflow | `clusterScan.phase` | kubeconfig missing, API unreachable, RBAC denied, namespace allowlist violation, optional CRD/bootstrap unavailable | Biz Cluster Scan만 재실행 (read-only + optional Biz-remote Job) |
-| Final Decision Workflow | `finalDecision.status` | Critical finding, Secret exposure, unapproved exception, expired exception | 전체 또는 실패 workflow 재실행 후 재판정 |
+| Code / Artifact Workflow | `artifactScan.phase` | missing artifact, artifactInput checksum mismatch, scanner error, stale DB/rule, registry pull failure, digest mismatch | Code / Artifact Scan만 재실행 (Mgmt-local Job) → `PATCH /scan-runs/{id}/retry` scope `ArtifactOnly` |
+| Biz Cluster Workflow | `clusterScan.phase` | kubeconfig missing, API unreachable, RBAC denied, namespace allowlist violation, optional CRD/bootstrap unavailable | Biz Cluster Scan만 재실행 (read-only + optional Biz-remote Job) → scope `ClusterOnly` |
+| Final Decision Workflow | `finalDecision.status` | Critical finding, Secret exposure, unapproved exception, expired exception | 전체 또는 실패 workflow 재실행 후 재판정 → scope `Full` / `FinalDecisionOnly` |
+
+`Assessments` 메뉴의 "실패 workflow 재실행" 버튼은 해당 workflow scope로 `PATCH /api/v1/scan-runs/{id}/retry`를 호출하고, 응답 `202` 후 `GET /api/v1/scan-runs/{id}/status` 폴링으로 갱신된 phase를 표시한다. 새 ScanRun id를 만들지 않고 동일 id의 phase가 갱신된다(retry/resume state).
 
 워크플로우 상세 화면은 같은 `ScanRun` 안에서 단계별 timestamps,
 conditions, raw report 링크, normalized finding 링크를 보여준다. 사용자는
