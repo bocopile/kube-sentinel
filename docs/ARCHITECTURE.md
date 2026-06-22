@@ -2,9 +2,8 @@
 
 ## 개요
 
-kube-sentinel은 Mgmt Cluster에 설치되는 단일 `kube-sentinel-operator`를
-중심으로 동작한다. Biz Cluster에는 kube-sentinel operator와 CRD를 설치하지
-않고, Mgmt operator가 저장된 kubeconfig를 사용해 검사에 필요한 리소스만
+kube-sentinel은 Mgmt Cluster에 설치되는 단일 `kube-sentinel-operator`를 중심으로 동작한다.
+Biz Cluster에는 kube-sentinel operator와 CRD를 설치하지 않고, Mgmt operator가 저장된 kubeconfig를 사용해 검사에 필요한 리소스만
 원격 적용한다.
 
 용어:
@@ -41,8 +40,8 @@ Biz Cluster의 주요 구성:
 | `SecurityAssessment` | 검사 템플릿과 선택 target 목록. |
 | `ScanRun` | 하나 이상의 target에 대해 실행되는 검사 실행 단위. |
 
-Mgmt operator는 이 CR들을 assessment Job, read-only inspection, normalized
-finding, report artifact, dashboard record, status condition으로 reconcile한다.
+Mgmt operator는 이 CR들을 assessment Job, read-only inspection, normalized finding, report artifact,
+dashboard record, status condition으로 reconcile한다.
 
 ## Remote apply mode
 
@@ -97,27 +96,23 @@ flowchart LR
 
 - `ClusterTarget`, `SecurityAssessment`, `ScanRun`은 Mgmt Cluster에만 존재한다.
 - Biz Cluster에는 kube-sentinel CRD와 operator를 설치하지 않는다.
-- Mgmt operator는 각 Biz Cluster의 kubeconfig Secret을 사용해 검사에 필요한
-  Job, ConfigMap, ServiceAccount, Role, RoleBinding만 원격 적용한다.
-- 검사 전 preflight로 namespace, RBAC, image pull, report upload, Trivy
-  Operator CRD 여부를 확인한다.
-- 누락된 항목은 `설치 필요` 상태로 표시하고, 정책상 허용된 bootstrap 항목만
-  Mgmt operator가 설치한다.
-- Remote apply는 finding과 report 생성을 위한 검사 리소스로 제한한다. 고객
-  application workload, 기존 RBAC, Service, Ingress, Secret을 자동 개선하거나
-  수정하지 않는다.
-- 검사 결과는 감사/재현성을 위한 immutable artifact와 dashboard/API 조회를
-  위한 metadata/index record로 나누어 저장한다.
+- Mgmt operator는 각 Biz Cluster의 kubeconfig Secret을 사용해 검사에 필요한 Job, ConfigMap, ServiceAccount, Role,
+  RoleBinding만 원격 적용한다.
+- 검사 전 preflight로 namespace, RBAC, image pull, report upload, Trivy Operator CRD 여부를 확인한다.
+- 누락된 항목은 `설치 필요` 상태로 표시하고, 정책상 허용된 bootstrap 항목만 Mgmt operator가 설치한다.
+- Remote apply는 finding과 report 생성을 위한 검사 리소스로 제한한다.
+  고객 application workload, 기존 RBAC, Service, Ingress, Secret을 자동 개선하거나 수정하지 않는다.
+- 검사 결과는 감사/재현성을 위한 immutable artifact와 dashboard/API 조회를 위한 metadata/index record로 나누어 저장한다.
 - Remote object는 Mgmt Cluster CR을 향한 ownerReference를 사용할 수 없다.
   label과 annotation으로 추적한다.
 
 ## Middleware and version baseline
 
-This baseline separates first-scope required middleware from optional inputs and
-Phase 2 extensions. Versions are a PoC validation baseline as of 2026-06-18.
-Implementation must pin exact tool versions in build scripts, container image
-tags, or scanner baseline reports. Do not treat floating tags such as `latest`
-as a valid final-check baseline.
+This baseline separates first-scope required middleware from optional inputs and Phase 2 extensions.
+Versions are a PoC validation baseline as of 2026-06-18.
+Implementation must pin exact tool versions in build scripts, container image tags, or scanner
+baseline reports.
+Do not treat floating tags such as `latest` as a valid final-check baseline.
 
 ### First-scope platform baseline
 
@@ -159,8 +154,8 @@ as a valid final-check baseline.
 
 ### Artifact Store backend plugin
 
-Artifact Store는 S3/MinIO에 고정하지 않는다. 제품 코드는 다음 interface에
-의존하고, 실제 저장소는 backend plugin으로 선택한다.
+Artifact Store는 S3/MinIO에 고정하지 않는다.
+제품 코드는 다음 interface에 의존하고, 실제 저장소는 backend plugin으로 선택한다.
 
 ```go
 type ArtifactStore interface {
@@ -181,11 +176,10 @@ type ArtifactStore interface {
 | NFS/PVC | 단순 내부망 배포와 폐쇄망 PoC |
 | OCI artifact | 향후 evidence bundle 배포/보관 후보 |
 
-Metadata DB(PostgreSQL)는 raw scanner output, normalized finding, scan health,
-final decision의 query 정본을 담당하고, Artifact Store는 감사와 재현성을 위한
-파생·증적 산출물(SBOM, evidence bundle, scanner baseline, artifact-input manifest,
-exported report)을 보관한다. 어떤 backend를 사용하더라도 artifact
-path, checksum, schema version, scanner baseline metadata는 동일하게 유지한다.
+Metadata DB(PostgreSQL)는 raw scanner output, normalized finding, scan health, final decision의 query
+정본을 담당하고, Artifact Store는 감사와 재현성을 위한 파생·증적 산출물(SBOM, evidence bundle, scanner baseline,
+artifact-input manifest, exported report)을 보관한다.
+어떤 backend를 사용하더라도 artifact path, checksum, schema version, scanner baseline metadata는 동일하게 유지한다.
 
 ### Optional first-scope inputs
 
@@ -207,17 +201,15 @@ path, checksum, schema version, scanner baseline metadata는 동일하게 유지
 
 Version governance:
 
-- Every `ScanRun` must record scanner binary versions, vulnerability DB dates,
-  policy bundle versions, and image digests for scanner images.
+- Every `ScanRun` must record scanner binary versions, vulnerability DB dates, policy bundle
+  versions, and image digests for scanner images.
 - Scanner images must be pinned by digest in final-check environments.
-- Tool upgrades must update this baseline or record an explicit exception in
-  the evidence bundle.
-- A scan with missing tool version or DB/rule baseline must produce
-  `scan_health=Fail` or `scan_health=Warning` according to the final-check
-  policy.
-- AI remediation advisor가 활성화되면 model id/version과 prompt template hash를
-  scanner version과 동급으로 기록한다. model version 미기록 scan은
-  `scan_health=Warning`으로 처리한다. 상세는 [AI_REMEDIATION.md](./AI_REMEDIATION.md).
+- Tool upgrades must update this baseline or record an explicit exception in the evidence bundle.
+- A scan with missing tool version or DB/rule baseline must produce `scan_health=Fail` or
+  `scan_health=Warning` according to the final-check policy.
+- AI remediation advisor가 활성화되면 model id/version과 prompt template hash를 scanner version과 동급으로 기록한다.
+  model version 미기록 scan은 `scan_health=Warning`으로 처리한다.
+  상세는 [AI_REMEDIATION.md](./AI_REMEDIATION.md).
 
 ## Target prerequisites
 
@@ -240,18 +232,16 @@ Required target RBAC should be split by capability:
 | Inspect applied config | get/list/watch Pods, Deployments, DaemonSets, StatefulSets, ReplicaSets, RBAC, ServiceAccounts, Services, Ingresses |
 | Secret references | inspect workload references only; do not read raw Secret data |
 
-The target kubeconfig Secret is the most sensitive Mgmt Cluster asset. It
-requires encryption at rest, narrow RBAC, rotation, and audit logging.
+The target kubeconfig Secret is the most sensitive Mgmt Cluster asset.
+It requires encryption at rest, narrow RBAC, rotation, and audit logging.
 
 Bootstrap decision:
 
 1. 검사 전 preflight를 실행한다.
 2. namespace, RBAC, image pull, report upload, Trivy Operator CRD 여부를 확인한다.
 3. 없는 항목은 `설치 필요` 또는 `CapabilityMissing` 상태로 표시한다.
-4. `ClusterTarget.spec.bootstrapPolicy`가 허용한 항목만 Mgmt operator가 생성하거나
-   설정한다.
-5. 고객 workload, 기존 Secret, 기존 Service/Ingress, 기존 application RBAC는 자동
-   수정하지 않는다.
+4. `ClusterTarget.spec.bootstrapPolicy`가 허용한 항목만 Mgmt operator가 생성하거나 설정한다.
+5. 고객 workload, 기존 Secret, 기존 Service/Ingress, 기존 application RBAC는 자동 수정하지 않는다.
 
 | 구분 | 자동 설치 가능 | 자동 수정 금지 |
 | --- | --- | --- |
@@ -262,27 +252,24 @@ Bootstrap decision:
 | Trivy Operator | 1차에서는 설치하지 않음 | 기존 operator 설정 변경 |
 
 기본 Biz Cluster credential은 `namespaces create/update` 권한을 요구하지 않는다.
-자동 namespace 생성이 필요한 환경은 별도 bootstrap capability와 RBAC review를
-거쳐야 한다.
+자동 namespace 생성이 필요한 환경은 별도 bootstrap capability와 RBAC review를 거쳐야 한다.
 
 ## Target registration and kubeconfig storage
 
-Biz Clusters appear in the dashboard only after a `ClusterTarget` CR exists in
-the Mgmt Cluster. The `ClusterTarget` stores non-secret metadata and a
-reference to a kubeconfig Secret; it must not inline kubeconfig data.
+Biz Clusters appear in the dashboard only after a `ClusterTarget` CR exists in the Mgmt Cluster.
+The `ClusterTarget` stores non-secret metadata and a reference to a kubeconfig Secret; it must not
+inline kubeconfig data.
 
 Registration flow:
 
-1. An operator creates or imports a restricted ServiceAccount in the Biz
-   Cluster.
-2. The target ServiceAccount token or kubeconfig is stored as a Mgmt Cluster
-   Secret.
+1. An operator creates or imports a restricted ServiceAccount in the Biz Cluster.
+2. The target ServiceAccount token or kubeconfig is stored as a Mgmt Cluster Secret.
 3. A `ClusterTarget` CR references that Secret through `spec.kubeconfigRef`.
 4. The management controller validates connectivity and permissions.
-5. The controller writes connection, capability, and discovery summary fields
-   into `ClusterTarget.status`.
-6. The dashboard cluster list reads `ClusterTarget` objects and status from the
-   Mgmt Cluster, never kubeconfig Secret data.
+5. The controller writes connection, capability, and discovery summary fields into
+   `ClusterTarget.status`.
+6. The dashboard cluster list reads `ClusterTarget` objects and status from the Mgmt Cluster, never
+   kubeconfig Secret data.
 
 Recommended Secret shape:
 
@@ -335,18 +322,15 @@ spec:
 
 Kubeconfig storage rules:
 
-- Store kubeconfigs only in Mgmt Cluster Secrets or an external secret
-  manager synced into Secrets.
+- Store kubeconfigs only in Mgmt Cluster Secrets or an external secret manager synced into Secrets.
 - Enable Kubernetes encryption at rest for Secrets in the Mgmt Cluster.
-- Grant Secret read access only to the kube-sentinel management controller and
-  a narrow break-glass administrator role.
-- Never expose kubeconfig data through dashboard APIs, logs, reports, status, or
-  events.
+- Grant Secret read access only to the kube-sentinel management controller and a narrow break-glass
+  administrator role.
+- Never expose kubeconfig data through dashboard APIs, logs, reports, status, or events.
 - Rotate target credentials and record `status.lastCredentialRotationAt`.
-- Prefer target ServiceAccount credentials with the minimum RBAC needed for the
-  selected profiles.
-- If a target is removed, delete or revoke the target credential and run
-  label-based remote garbage collection.
+- Prefer target ServiceAccount credentials with the minimum RBAC needed for the selected profiles.
+- If a target is removed, delete or revoke the target credential and run label-based remote garbage
+  collection.
 
 ## API examples
 
@@ -417,8 +401,8 @@ spec:
 
 ## Assessment reliability layer
 
-Scanner execution is not enough for a final-check product. The first MVP must
-also preserve the information required to explain why a scan is reliable,
+Scanner execution is not enough for a final-check product.
+The first MVP must also preserve the information required to explain why a scan is reliable,
 reproducible, and safe to review.
 
 Required first-scope support features:
@@ -435,41 +419,40 @@ Required first-scope support features:
 | Scan health summary | Treat scanner errors, unsupported targets, stale baselines, and missing artifacts as reportable failures. |
 
 Optional first-scope support features are documented in
-[ASSESSMENT_SUPPORT_FEATURES.md](./ASSESSMENT_SUPPORT_FEATURES.md). Trivy
-Operator `VulnerabilityReport` is one of those optional inputs and remains
-inside the first-scope architecture when the CRD and read-only permission are
-already available.
+[ASSESSMENT_SUPPORT_FEATURES.md](./ASSESSMENT_SUPPORT_FEATURES.md).
+Trivy Operator `VulnerabilityReport` is one of those optional inputs and remains inside the
+first-scope architecture when the CRD and read-only permission are already available.
 
 ## Managed infrastructure boundary
 
-The kube-sentinel management controller does not create or manage customer
-application infrastructure. It also does not require Loki, Mimir, Tempo, or a
-full LGTM stack for the first MVP.
+The kube-sentinel management controller does not create or manage customer application
+infrastructure.
+It also does not require Loki, Mimir, Tempo, or a full LGTM stack for the first MVP.
 
 The first MVP stores assessment outputs in a split Report Store:
 
-- Report Metadata Store (PostgreSQL) for queryable ScanRun, raw_reports, Finding,
-  ScanHealth, FinalDecision, ExceptionReview, and artifact index records.
-- Report Artifact Store for SBOMs, integrity reports, scanner baselines,
-  artifact input manifests, exported human reports, and evidence bundles.
-- Assessment API for loading metadata records, resolving artifact references,
-  and serving dashboard/report download requests.
+- Report Metadata Store (PostgreSQL) for queryable ScanRun, raw_reports, Finding, ScanHealth,
+  FinalDecision, ExceptionReview, and artifact index records.
+- Report Artifact Store for SBOMs, integrity reports, scanner baselines, artifact input manifests,
+  exported human reports, and evidence bundles.
+- Assessment API for loading metadata records, resolving artifact references, and serving
+  dashboard/report download requests.
 
-Grafana LGTM, OTel collectors, long-running sensors, and runtime telemetry are
-Phase 2 telemetry extensions. If enabled later, they must be designed as an
-optional export path from normalized findings and report events, not as the
-primary source of truth for final-check results.
+Grafana LGTM, OTel collectors, long-running sensors, and runtime telemetry are Phase 2 telemetry
+extensions.
+If enabled later, they must be designed as an optional export path from normalized findings and
+report events, not as the primary source of truth for final-check results.
 
-The `security_assessment` feature manages only assessment jobs, config, and
-report volumes for the selected final-check scope. It may inspect delivery
-artifacts and applied cluster configuration metadata, but it must not collect
-raw Secret values.
+The `security_assessment` feature manages only assessment jobs, config, and report volumes for the
+selected final-check scope.
+It may inspect delivery artifacts and applied cluster configuration metadata, but it must not
+collect raw Secret values.
 
 ## Feature-as-Plugin architecture
 
-검사 기능은 Reconciler에 하드코딩하지 않는다. 각 기능은 Feature plugin으로
-구현하고 registry에 자기 등록한다. Reconciler는 workflow, status, remote apply,
-GC만 관리하고 scanner별 세부 로직은 Feature가 담당한다.
+검사 기능은 Reconciler에 하드코딩하지 않는다.
+각 기능은 Feature plugin으로 구현하고 registry에 자기 등록한다.
+Reconciler는 workflow, status, remote apply, GC만 관리하고 scanner별 세부 로직은 Feature가 담당한다.
 
 ```go
 type Feature interface {
@@ -519,12 +502,12 @@ Priority 기본값:
 
 ### Profile / features → registry feature ID 매핑 (정본)
 
-`SecurityAssessment.spec.profiles[]`는 registry feature ID **base set**을 결정하고,
-`spec.features[]`는 umbrella 확장·enable/disable·config override를 적용한다.
-아래 표가 profile→registry feature ID→`findings.category` 단일 정본이며,
-`category` 값은 [DATABASE.md](./DATABASE.md) `findings.category` enum과 일치한다
-(feature ID `image_integrity`/`secret_reference`/`source_security`와 category
-`integrity`/`secret_ref`/`sast`는 의미는 같고 표기가 다름에 유의).
+`SecurityAssessment.spec.profiles[]`는 registry feature ID **base set**을 결정하고, `spec.features[]`는
+umbrella 확장·enable/disable·config override를 적용한다.
+아래 표가 profile→registry feature ID→`findings.category` 단일 정본이며, `category` 값은
+[DATABASE.md](./DATABASE.md) `findings.category` enum과 일치한다 (feature ID
+`image_integrity`/`secret_reference`/`source_security`와 category `integrity`/`secret_ref`/`sast`는
+의미는 같고 표기가 다름에 유의).
 
 | `spec.profiles[]` 값 | Workflow | enabled registry feature ID | 생성 `findings.category` |
 |---|---|---|---|
@@ -541,25 +524,27 @@ umbrella `features[].name` 확장:
 | `trivy` | `image_vulnerability`, `image_integrity`, `sbom`, `trivy_operator_reports` |
 | `security_assessment` | `source_security`, `secret_scan`, `kubernetes_manifest`, `rbac_review`, `dockerfile_scan`, `script_scan`, `applied_cluster_config`, `secret_reference` |
 
-`scan_health`는 특정 profile이 아니라 scanner pipeline 전반의 실패에서 생성되는 공통
-category이므로 위 표에 행별로 넣지 않는다. `target_preflight`/`bootstrap`/`report_export`는
-profile과 무관한 lifecycle feature이고, `trivy_operator_reports`는 `ImageSupplyChain`과
-target capability 허용 시, `remediation_enrichment`는 `aiRemediation.enabled=true`일 때만
-enabled된다.
+`scan_health`는 특정 profile이 아니라 scanner pipeline 전반의 실패에서 생성되는 공통 category이므로 위 표에 행별로 넣지 않는다.
+`target_preflight`/`bootstrap`/`report_export`는 profile과 무관한 lifecycle feature이고,
+`trivy_operator_reports`는 `ImageSupplyChain`과 target capability 허용 시, `remediation_enrichment`는
+`aiRemediation.enabled=true`일 때만 enabled된다.
 
 **features 병합 규칙** — orchestrator는 다음 순서로 enabled feature set을 deterministic하게 resolve한다.
 
 1. `ScanRun.spec.profiles[]`가 비어 있지 않으면 `SecurityAssessment.spec.profiles[]` 대신 사용한다(override).
-2. effective profiles를 위 표로 registry feature ID 집합(base set)으로 union한다. 중복 profile은 한 번만 적용한다.
+2. effective profiles를 위 표로 registry feature ID 집합(base set)으로 union한다.
+   중복 profile은 한 번만 적용한다.
 3. `features[].name`을 umbrella 표로 registry feature ID 목록으로 확장한다.
 4. `features[].enabled=true`는 base set에 추가(∪), `enabled=false`는 제거(−)한다.
-5. `features[].config`는 해당 feature에 항상 우선 적용한다(profile 기본 config override). 동일 feature ID가 여러 번이면 마지막 `features[]` 항목이 이긴다.
-6. 최종 enabled set = (profiles 확장 ∪ `features[].enabled=true`) − (`features[].enabled=false`). priority 오름차순, 같은 priority는 feature ID 사전순으로 정렬한다.
+5. `features[].config`는 해당 feature에 항상 우선 적용한다(profile 기본 config override).
+   동일 feature ID가 여러 번이면 마지막 `features[]` 항목이 이긴다.
+6. 최종 enabled set = (profiles 확장 ∪ `features[].enabled=true`) − (`features[].enabled=false`).
+   priority 오름차순, 같은 priority는 feature ID 사전순으로 정렬한다.
 
-umbrella 명칭·registry feature ID·profile 매핑 표 어디에도 없는 `features[].name` 또는
-`profiles[]` 값은 `ConfigError`로 status(`status.features[].reason=ConfigError` 또는
-`status.conditions`)에 기록하고 해당 항목만 무시한다. unknown 항목 하나가 전체 scan을
-실패시키지 않으며, 나머지 valid feature는 정상 실행한다.
+umbrella 명칭·registry feature ID·profile 매핑 표 어디에도 없는 `features[].name` 또는 `profiles[]` 값은
+`ConfigError`로 status(`status.features[].reason=ConfigError` 또는 `status.conditions`)에 기록하고 해당 항목만
+무시한다.
+unknown 항목 하나가 전체 scan을 실패시키지 않으며, 나머지 valid feature는 정상 실행한다.
 
 ## Reconcile flow
 
@@ -567,33 +552,47 @@ umbrella 명칭·registry feature ID·profile 매핑 표 어디에도 없는 `fe
 2. `SecurityAssessment`를 로드한다.
 3. 선택된 `ClusterTarget`을 로드한다.
 4. `ScanRun` 실행 context를 생성한다.
-5. `profiles[]`를 매핑 정본 표로 base set으로 확장하고 `features[]`(enable/disable·config override)와
-   병합해 enabled feature를 deterministic하게 resolve한 뒤, priority → feature ID 사전순으로 정렬한다.
+5. `profiles[]`를 매핑 정본 표로 base set으로 확장하고 `features[]`(enable/disable·config override)와 병합해 enabled
+   feature를 deterministic하게 resolve한 뒤, priority → feature ID 사전순으로 정렬한다.
    unknown profile/feature는 `ConfigError`로 기록하고 제외한다.
-5.5. ScanRun `metadata.annotations`의 `security.kube-sentinel.io/retry-scope`(backend `PATCH /api/v1/scan-runs/{id}/retry`가 patch)가 있으면 부분 재실행 분기로 진입한다. `ArtifactOnly`는 `status.artifactScan`만, `ClusterOnly`는 `status.clusterScan`만 `Pending`으로 되돌리고 나머지 phase·이미 저장된 finding은 보존한다. `FinalDecisionOnly`는 두 scan phase를 재실행하지 않고 상관 분석/finalDecision 재계산만 수행한다. `Full` 또는 annotation 없음(최초 생성)은 전체 phase를 실행한다. 재실행으로 생성된 finding은 `findings`에 finding_id 기준 멱등 upsert되며(I-8 규칙), reconcile 완료 후 reconciler가 retry-scope annotation을 observed 처리(clear)한다.
+   5.5.
+   ScanRun `metadata.annotations`의 `security.kube-sentinel.io/retry-scope`(backend `PATCH
+   /api/v1/scan-runs/{id}/retry`가 patch)가 있으면 부분 재실행 분기로 진입한다.
+   `ArtifactOnly`는 `status.artifactScan`만, `ClusterOnly`는 `status.clusterScan`만 `Pending`으로 되돌리고 나머지
+   phase·이미 저장된 finding은 보존한다.
+   `FinalDecisionOnly`는 두 scan phase를 재실행하지 않고 상관 분석/finalDecision 재계산만 수행한다.
+   `Full` 또는 annotation 없음(최초 생성)은 전체 phase를 실행한다.
+   재실행으로 생성된 finding은 `findings`에 finding_id 기준 멱등 upsert되며(I-8 규칙), reconcile 완료 후 reconciler가
+   retry-scope annotation을 observed 처리(clear)한다.
 6. feature별 `Validate()`를 실행한다.
 7. feature별 `Preflight()`를 실행해 target 환경 실패를 scanner finding과 분리한다.
 8. bootstrap 정책상 허용된 누락 항목만 `Build()` 결과에 포함한다.
-9. feature별 `Build()`로 Code / Artifact Scan은 Mgmt-local Job desired state(artifact-fetch init container + input/output `emptyDir`)를, Biz Cluster Scan은 read-only inspection과 옵션 Biz-remote scanner Job desired state를 분리 생성한다.
+9. feature별 `Build()`로 Code / Artifact Scan은 Mgmt-local Job desired state(artifact-fetch init
+   container + input/output `emptyDir`)를, Biz Cluster Scan은 read-only inspection과 옵션 Biz-remote
+   scanner Job desired state를 분리 생성한다.
 10. Mgmt-local object(Code / Artifact Job 포함)를 server-side apply로 적용한다.
 11. Biz Cluster Scan용 bootstrap 또는 옵션 remote scanner object만 remote apply client로 적용한다.
-12. Mgmt-local Job·Biz read-only inspection·옵션 remote scanner Job에서 raw report를 수집해 PostgreSQL `raw_reports`에 저장한다(Artifact Store에 raw 정본 경로를 만들지 않음 — §Runner placement and artifact input delivery).
+12. Mgmt-local Job·Biz read-only inspection·옵션 remote scanner Job에서 raw report를 수집해 PostgreSQL
+    `raw_reports`에 저장한다(Artifact Store에 raw 정본 경로를 만들지 않음 — §Runner placement and artifact input
+    delivery).
 13. feature별 `Collect()`로 artifact reference를 수집한다.
 14. feature별 `Normalize()`로 normalized finding과 scan health를 생성한다.
 15. Code / Artifact Scan과 Biz Cluster Scan 결과를 상관 분석하고 final decision을 확정한다.
-16. Evidence Bundle 내용과 Exception Review 후보를 생성한다. evidence bundle 생성 시 `findings`에 저장될 normalized finding set에서 `normalized/findings.jsonl` immutable snapshot을 준비한다.
-17. queryable ScanRun, raw scanner output(`raw_reports`), normalized finding(`findings`),
-    scan health, 확정된 final decision, exception review row를 PostgreSQL Report Metadata Store에 upsert한다.
-18. SBOM, scanner baseline, artifact-input manifest, exported report, evidence bundle 같은
-    파생·증적 산출물을 Report Artifact Store에 기록하고 `artifact_index` row를 upsert한다.
+16. Evidence Bundle 내용과 Exception Review 후보를 생성한다.
+    evidence bundle 생성 시 `findings`에 저장될 normalized finding set에서 `normalized/findings.jsonl`
+    immutable snapshot을 준비한다.
+17. queryable ScanRun, raw scanner output(`raw_reports`), normalized finding(`findings`), scan
+    health, 확정된 final decision, exception review row를 PostgreSQL Report Metadata Store에 upsert한다.
+18. SBOM, scanner baseline, artifact-input manifest, exported report, evidence bundle 같은 파생·증적 산출물을
+    Report Artifact Store에 기록하고 `artifact_index` row를 upsert한다.
 19. disabled/stale remote resource를 label 기반으로 GC한다.
 20. `ClusterTarget.status`와 `ScanRun.status`를 갱신한다.
 
 ## Runner placement and artifact input delivery
 
-Runner placement는 검사 그룹이 deterministic하게 결정하므로 `runnerPolicy`/`placement`
-CRD 필드를 추가하지 않는다. Code / Artifact Scan은 항상 Mgmt-local Job이고,
-Biz Cluster Scan은 항상 Mgmt operator read-only inspection(+옵션 remote scanner Job)이다.
+Runner placement는 검사 그룹이 deterministic하게 결정하므로 `runnerPolicy`/`placement` CRD 필드를 추가하지 않는다.
+Code / Artifact Scan은 항상 Mgmt-local Job이고, Biz Cluster Scan은 항상 Mgmt operator read-only
+inspection(+옵션 remote scanner Job)이다.
 
 | Workflow | runner 위치 | 생성 주체 | raw report 수집 |
 |---|---|---|---|
@@ -604,13 +603,13 @@ Biz Cluster Scan은 항상 Mgmt operator read-only inspection(+옵션 remote sca
 ### Artifact input 전달 규약
 
 Code / Artifact Scan은 `SecurityAssessment.spec.artifactInput`(`sourceRef`/`imageList`/
-`digestList`/`manifestRef`)을 Mgmt-local Job의 init container가 `emptyDir`(또는 run-scoped
-PVC) 공유 volume으로 전달하고, scanner container는 그 volume을 read-only로 mount한다.
+`digestList`/`manifestRef`)을 Mgmt-local Job의 init container가 `emptyDir`(또는 run-scoped PVC) 공유
+volume으로 전달하고, scanner container는 그 volume을 read-only로 mount한다.
 Biz Cluster에는 artifact 원문을 복제하지 않는다.
 
-1. **Preflight**: `artifactInput` 참조(path/artifactStorePath/imageList/digestList) 존재와,
-   `checksum`이 있으면 fetch 전후 digest 일치를 검증한다. 누락·checksum 불일치는
-   `scan_health=Fail`(필수 산출물 누락)로 기록하고 `ScanRun.status.artifactScan`을 `Failed`로 둔다.
+1. **Preflight**: `artifactInput` 참조(path/artifactStorePath/imageList/digestList) 존재와, `checksum`이
+   있으면 fetch 전후 digest 일치를 검증한다.
+   누락·checksum 불일치는 `scan_health=Fail`(필수 산출물 누락)로 기록하고 `ScanRun.status.artifactScan`을 `Failed`로 둔다.
 2. **Staging(init container)** — `emptyDir`(또는 run-scoped PVC) 공유 volume:
 
 | `ArtifactInputSpec` 필드 | 전달 방식 |
@@ -620,11 +619,12 @@ Biz Cluster에는 artifact 원문을 복제하지 않는다.
 | `imageList[].tarPath` | offline image tar를 `emptyDir`로 fetch |
 | `imageList[].image` / `digestList[]` | registry digest 조회·pull(registry credential 사용) |
 
-3. **Scanner container**는 staging mount만 읽고, raw output은 PostgreSQL `raw_reports`에 저장한다(저장 정본은 PostgreSQL).
+3. **Scanner container**는 staging mount만 읽고, raw output은 PostgreSQL `raw_reports`에 저장한다(저장 정본은
+   PostgreSQL).
 
-Reconciler는 scanner별 세부 구현을 알지 않는다. 새 scanner 또는 저장소 backend는
-Feature plugin 또는 Artifact Store backend plugin으로 추가하며, Reconciler의
-핵심 workflow는 변경하지 않는다.
+Reconciler는 scanner별 세부 구현을 알지 않는다.
+새 scanner 또는 저장소 backend는 Feature plugin 또는 Artifact Store backend plugin으로 추가하며, Reconciler의 핵심
+workflow는 변경하지 않는다.
 
 ## Scan resource configuration policy
 
@@ -639,26 +639,25 @@ Allowed scan resource config fields:
 
 Forbidden behavior:
 
-- Adding arbitrary containers, init containers, volumes, hostPath mounts, service
-  account names, image names, image pull policies, security contexts, commands,
-  or arguments.
+- Adding arbitrary containers, init containers, volumes, hostPath mounts, service account names,
+  image names, image pull policies, security contexts, commands, or arguments.
 - Adding `tolerations: [{ operator: Exists }]`.
-- Tolerating control-plane taints unless the assessment is configured with an
-  explicit installation-time allow-control-plane setting.
+- Tolerating control-plane taints unless the assessment is configured with an explicit
+  installation-time allow-control-plane setting.
 - Raising privileges beyond each scan job's built-in security context.
 
 Toleration validation must be implemented before applying scan resource config.
-Invalid config sets the relevant workflow to `ConfigError` and must not be
-applied.
+Invalid config sets the relevant workflow to `ConfigError` and must not be applied.
 
 ## HostPath policy
 
-HostPath mounts are not required for the first MVP. Code / Artifact Scan runs as a
-Mgmt-local Job and stages `artifactInput` through an init container and an `emptyDir`
-(or run-scoped PVC) shared volume; Biz Cluster Scan runs through Kubernetes API
-read-only inspection and an optional allowed remote scanner Job. hostPath mounts are
-not used. Any future hostPath usage requires an architecture update, explicit
-customer approval, and a security review.
+HostPath mounts are not required for the first MVP.
+Code / Artifact Scan runs as a Mgmt-local Job and stages `artifactInput` through an init container
+and an `emptyDir` (or run-scoped PVC) shared volume; Biz Cluster Scan runs through Kubernetes API
+read-only inspection and an optional allowed remote scanner Job.
+hostPath mounts are not used.
+Any future hostPath usage requires an architecture update, explicit customer approval, and a
+security review.
 
 ## Ownership model
 
@@ -696,8 +695,8 @@ metadata:
     security.kube-sentinel.io/spec-hash: <sha256>
 ```
 
-Remote objects cannot use ownerReferences to Mgmt Cluster CRs. Garbage
-collection must use lifecycle-specific label selectors.
+Remote objects cannot use ownerReferences to Mgmt Cluster CRs.
+Garbage collection must use lifecycle-specific label selectors.
 
 Target-scoped GC:
 
@@ -725,8 +724,8 @@ kube-sentinel/<target>/<feature-id>/run
 
 ## Result persistence and routing
 
-Assessment data is written to both storage layers. The artifact layer preserves
-the evidence; the metadata layer serves dashboard/API queries.
+Assessment data is written to both storage layers.
+The artifact layer preserves the evidence; the metadata layer serves dashboard/API queries.
 
 | Source | Input path | Artifact Store write | Metadata Store write | Decision phase |
 | --- | --- | --- | --- | --- |
@@ -734,8 +733,9 @@ the evidence; the metadata layer serves dashboard/API queries.
 | Security Assessment | Scanner reports and applied cluster configuration snapshot | applied snapshot, scanner baseline, evidence bundle export | `raw_reports`, `sast`, `secret`, `kubernetes`, `rbac`, `dockerfile`, `script`, `scan_health`, final decision, exception review rows | Discovery / Priority / Validation |
 | Final report | Final decision and linked evidence | Markdown/PDF/HTML export and evidence bundle | report index row with artifact references | Validation / Exception Review |
 
-Dashboard menus should be decision-oriented. Scanner categories should appear as
-tabs or filters inside the larger menu groups, not as top-level navigation.
+Dashboard menus should be decision-oriented.
+Scanner categories should appear as tabs or filters inside the larger menu groups, not as top-level
+navigation.
 
 | Top-level menu | Primary categories and data |
 | --- | --- |
@@ -748,25 +748,24 @@ tabs or filters inside the larger menu groups, not as top-level navigation.
 
 ## Report store policy
 
-The Report Store is the first MVP source of truth. It must preserve enough
-evidence to reproduce the final decision without requiring a telemetry backend.
-Report Artifact Store는 backend plugin으로 교체 가능해야 하며, S3/MinIO 전용
-구현에 의존하면 안 된다. SeaweedFS는 S3-compatible backend 또는 native filer
-backend 중 하나로 붙일 수 있다.
+The Report Store is the first MVP source of truth.
+It must preserve enough evidence to reproduce the final decision without requiring a telemetry
+backend.
+Report Artifact Store는 backend plugin으로 교체 가능해야 하며, S3/MinIO 전용 구현에 의존하면 안 된다.
+SeaweedFS는 S3-compatible backend 또는 native filer backend 중 하나로 붙일 수 있다.
 
 Required defaults:
 
 - Store raw scanner reports in PostgreSQL `raw_reports`, separate from normalized findings.
 - Store normalized findings in PostgreSQL `findings` with stable `finding_id` values.
-- Store scan health records for scanner errors, skipped scans, unsupported
-  targets, stale DB/rule baselines, and missing artifacts.
-- Store final decision summaries with links to the ScanRun, target, artifacts,
-  exception candidates, and evidence bundle.
+- Store scan health records for scanner errors, skipped scans, unsupported targets, stale DB/rule
+  baselines, and missing artifacts.
+- Store final decision summaries with links to the ScanRun, target, artifacts, exception candidates,
+  and evidence bundle.
 - Do not store raw Secret values.
 - Keep report artifact paths stable across dashboard, export, and audit views.
-- Treat dashboard records as read models derived from PostgreSQL query tables;
-  evidence bundle exports are immutable snapshots, not the only copy of the
-  assessment result.
+- Treat dashboard records as read models derived from PostgreSQL query tables; evidence bundle
+  exports are immutable snapshots, not the only copy of the assessment result.
 
 ### Result storage format
 
@@ -774,16 +773,17 @@ Required defaults:
 
 저장 모델은 PostgreSQL과 Artifact Store를 역할별로 분리한다.
 
-- PostgreSQL: raw scanner 분석 결과, normalized finding, scan health, final decision,
-  exception review, artifact index. 모든 dashboard/API 쿼리는 PostgreSQL에서 수행한다.
+- PostgreSQL: raw scanner 분석 결과, normalized finding, scan health, final decision, exception review,
+  artifact index.
+  모든 dashboard/API 쿼리는 PostgreSQL에서 수행한다.
 - Artifact Store: SBOM(CycloneDX), evidence bundle, human report, scanner baseline,
-  artifact-input.yaml. 대용량·표준 포맷·배포 증적 산출물을 보관한다.
+  artifact-input.yaml.
+  대용량·표준 포맷·배포 증적 산출물을 보관한다.
 
 PostgreSQL에서 JSONB를 사용하는 이유:
 - `raw_reports.data JSONB` + GIN 인덱스로 scanner 출력 내부 필드를 직접 조회할 수 있다.
 - TOAST 자동 오프로드로 대형 JSONB가 row scan 속도를 저하시키지 않는다.
-- `TEXT[]` 네이티브 타입으로 `target_names`, `namespace_allowlist` 등 배열 필드를
-  별도 테이블 없이 저장할 수 있다.
+- `TEXT[]` 네이티브 타입으로 `target_names`, `namespace_allowlist` 등 배열 필드를 별도 테이블 없이 저장할 수 있다.
 - MariaDB는 GIN 인덱스와 ARRAY 타입을 지원하지 않으므로 이 설계에서는 PostgreSQL만 사용한다.
 
 Recommended formats:
@@ -837,7 +837,8 @@ scanner별 저장 포맷:
 | Cosign/Notation | JSON | `json` | verification result |
 | Crane | JSON | `json` | digest metadata |
 
-Normalized `findings.jsonl` is an evidence-bundle export generated from PostgreSQL `findings`; PostgreSQL `findings` is the canonical query source.
+Normalized `findings.jsonl` is an evidence-bundle export generated from PostgreSQL `findings`;
+PostgreSQL `findings` is the canonical query source.
 Each line must contain at least:
 
 ```json
@@ -863,9 +864,9 @@ Each line must contain at least:
 
 Artifact path convention:
 
-raw scanner output은 PostgreSQL `raw_reports` 테이블에 저장하므로 `raw/` 경로는
-Artifact Store에 없다. Artifact Store에는 SBOM, evidence bundle, human report,
-scanner baseline, artifact input manifest만 보관한다.
+raw scanner output은 PostgreSQL `raw_reports` 테이블에 저장하므로 `raw/` 경로는 Artifact Store에 없다.
+Artifact Store에는 SBOM, evidence bundle, human report, scanner baseline, artifact input manifest만
+보관한다.
 
 ```text
 reports/
@@ -887,25 +888,23 @@ Retrieval rule:
 
 - Dashboard/API reads all list, filter, detail views from PostgreSQL.
   raw scanner output 재조회도 PostgreSQL `raw_reports` 테이블에서 수행한다.
-- SBOM, evidence bundle, exported report download는 `artifact_index`의 path를
-  참조해 Artifact Store에서 가져온다.
-- `artifact_index`는 Artifact Store 파일의 path, checksum, scanner version,
-  DB baseline date를 기록한다. PostgreSQL이 유실되어도 Artifact Store의
-  `manifest.json`과 SBOM에서 artifact_index를 재생성할 수 있어야 한다.
-- `raw_reports.data JSONB`는 재정규화(parser 변경 후 finding 재처리)의 입력으로
-  사용할 수 있다. 따라서 scanner 원본 출력을 손상 없이 저장해야 한다.
+- SBOM, evidence bundle, exported report download는 `artifact_index`의 path를 참조해 Artifact Store에서
+  가져온다.
+- `artifact_index`는 Artifact Store 파일의 path, checksum, scanner version, DB baseline date를 기록한다.
+  PostgreSQL이 유실되어도 Artifact Store의 `manifest.json`과 SBOM에서 artifact_index를 재생성할 수 있어야 한다.
+- `raw_reports.data JSONB`는 재정규화(parser 변경 후 finding 재처리)의 입력으로 사용할 수 있다.
+  따라서 scanner 원본 출력을 손상 없이 저장해야 한다.
 
 ## Mgmt controller RBAC
 
 The controller needs two permission sets:
 
-- Mgmt Cluster RBAC for kube-sentinel CRDs, target kubeconfig Secrets, status,
-  reports, and dashboard/API integration.
-- Biz Cluster RBAC embedded in each target kubeconfig for remote apply and
-  read-only inspection.
+- Mgmt Cluster RBAC for kube-sentinel CRDs, target kubeconfig Secrets, status, reports, and
+  dashboard/API integration.
+- Biz Cluster RBAC embedded in each target kubeconfig for remote apply and read-only inspection.
 
-Kubebuilder markers apply only to Mgmt Cluster permissions. Biz Cluster
-permissions are documented as bootstrap RBAC and validated through
+Kubebuilder markers apply only to Mgmt Cluster permissions.
+Biz Cluster permissions are documented as bootstrap RBAC and validated through
 `ClusterTarget.status`.
 
 Mgmt Cluster resources:
@@ -925,12 +924,12 @@ Mgmt Cluster resources:
 
 Biz Cluster remote apply resources:
 
-- `namespaces`: get, list, watch. create/update는 bootstrap 정책이 명시적으로
-  허용된 target에서만 별도 권한으로 부여
+- `namespaces`: get, list, watch.
+  create/update는 bootstrap 정책이 명시적으로 허용된 target에서만 별도 권한으로 부여
 - `pods`: get, list, watch
 - `configmaps`: get, list, watch, create, update, patch, delete
-- `secrets`: do not grant by default; inspect Secret references from workload
-  specs without reading raw Secret data
+- `secrets`: do not grant by default; inspect Secret references from workload specs without reading
+  raw Secret data
 - `services`: get, list, watch
 - `serviceaccounts`: get, list, watch, create, update, patch, delete
 
@@ -954,52 +953,47 @@ Optional Trivy Operator resources:
 
 - `aquasecurity.github.io/vulnerabilityreports`: get, list, watch
 
-Create/update/delete verbs in Biz Cluster credentials are for kube-sentinel
-scan resources only. They must not be used to mutate customer
-application workloads, application RBAC, Services, Ingresses, or Secrets as an
-automatic remediation action.
+Create/update/delete verbs in Biz Cluster credentials are for kube-sentinel scan resources only.
+They must not be used to mutate customer application workloads, application RBAC, Services,
+Ingresses, or Secrets as an automatic remediation action.
 
 Biz Cluster credential guardrails:
 
-- Create/update/delete is limited to resources labeled
-  `app.kubernetes.io/managed-by=kube-sentinel`.
-- Namespace create/update는 기본 bootstrap RBAC에 포함하지 않는다. 필요한 경우
-  `ClusterTarget.spec.bootstrapPolicy`와 별도 승인된 credential에서만 허용한다.
+- Create/update/delete is limited to resources labeled `app.kubernetes.io/managed-by=kube-sentinel`.
+- Namespace create/update는 기본 bootstrap RBAC에 포함하지 않는다.
+  필요한 경우 `ClusterTarget.spec.bootstrapPolicy`와 별도 승인된 credential에서만 허용한다.
 - Role and RoleBinding creation is limited to the `ClusterTarget.spec.targetNamespace`.
 - ClusterRole and ClusterRoleBinding are read-only in the first MVP.
-- Secret read permission is not granted by default. If a target credential
-  includes Secret read access, preflight must report it as a risk and scanner
+- Secret read permission is not granted by default.
+  If a target credential includes Secret read access, preflight must report it as a risk and scanner
   logic still must not read raw Secret data.
-- imagePullSecret은 Secret 값을 생성하거나 수정하지 않는다. 허용된 Secret 이름
-  참조만 scanner Job template에 연결할 수 있다.
-- Generated Roles must not include wildcard verbs, wildcard resources,
-  `secrets get/list/watch`, or `cluster-admin` binding.
+- imagePullSecret은 Secret 값을 생성하거나 수정하지 않는다.
+  허용된 Secret 이름 참조만 scanner Job template에 연결할 수 있다.
+- Generated Roles must not include wildcard verbs, wildcard resources, `secrets get/list/watch`, or
+  `cluster-admin` binding.
 
-Trivy Operator `VulnerabilityReport` ingestion is a current optional input
-path. If the CRD is present and the ClusterTarget has read permission, findings
-from VulnerabilityReports may be normalized with delivery image scan results.
-If it is absent, the assessment continues with registry digest or image tar
-scans.
+Trivy Operator `VulnerabilityReport` ingestion is a current optional input path.
+If the CRD is present and the ClusterTarget has read permission, findings from VulnerabilityReports
+may be normalized with delivery image scan results.
+If it is absent, the assessment continues with registry digest or image tar scans.
 
-Runtime event sensors are Next Version extensions. They are not part of the
-current final-check assessment architecture.
+Runtime event sensors are Next Version extensions.
+They are not part of the current final-check assessment architecture.
 
-Secrets are not read by default. The controller must not create or mutate
-customer credentials in Biz Clusters. Applied cluster configuration assessment
-may report Secret references, projected volumes, `env`/`envFrom`, and
-ServiceAccount token automount settings, but it must not read or persist Secret
+Secrets are not read by default.
+The controller must not create or mutate customer credentials in Biz Clusters.
+Applied cluster configuration assessment may report Secret references, projected volumes,
+`env`/`envFrom`, and ServiceAccount token automount settings, but it must not read or persist Secret
 data.
 
 ## Status model
 
-The Mgmt Cluster status model should expose target health and scan execution
-separately.
+The Mgmt Cluster status model should expose target health and scan execution separately.
 
 `ClusterTarget.status`:
 
 - `status.observedGeneration`
-- `status.phase`: `Pending`, `Ready`, `Degraded`, `AuthFailed`,
-  `Unreachable`, or `PermissionDenied`
+- `status.phase`: `Pending`, `Ready`, `Degraded`, `AuthFailed`, `Unreachable`, or `PermissionDenied`
 - `status.lastValidatedAt`
 - `status.lastCredentialRotationAt`
 - `status.kubernetesVersion`

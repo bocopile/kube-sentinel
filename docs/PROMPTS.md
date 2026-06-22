@@ -1,7 +1,6 @@
 # Orchestrator 프롬프트
 
-아래 prompt는 먼저 `orchestrator plan`으로 검토한 뒤, plan이 적절할 때만
-`orchestrator run`으로 실행한다.
+아래 prompt는 먼저 `orchestrator plan`으로 검토한 뒤, plan이 적절할 때만 `orchestrator run`으로 실행한다.
 
 모든 prompt는 project root가 다음 checkout이라고 가정한다.
 
@@ -25,8 +24,8 @@ orchestrator run --project . --request "<prompt>" --auto-approve
 
 ## 모노레포 3-모듈 구조
 
-이 프로젝트는 모노레포 안에 3개의 독립 빌드 단위로 구성된다. 상세는
-`docs/MODULES.md` 참조.
+이 프로젝트는 모노레포 안에 3개의 독립 빌드 단위로 구성된다.
+상세는 `docs/MODULES.md` 참조.
 
 | 모듈 | 경로 | 언어 | 역할 |
 |------|------|------|------|

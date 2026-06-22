@@ -1,7 +1,8 @@
 # API Design
 
-kube-sentinel backend REST API 명세. base path는 `/api/v1/`. 모든 응답은
-`Content-Type: application/json`이다.
+kube-sentinel backend REST API 명세.
+base path는 `/api/v1/`.
+모든 응답은 `Content-Type: application/json`이다.
 
 ---
 
@@ -163,7 +164,8 @@ dashboard Overview 화면용 집계 데이터.
 
 ### GET /api/v1/cluster-targets/{name}
 
-단건 조회. `name`은 ClusterTarget.metadata.name.
+단건 조회.
+`name`은 ClusterTarget.metadata.name.
 
 **응답 `200`:** 위 list items 단건과 동일 스키마.
 
@@ -218,8 +220,9 @@ dashboard Overview 화면용 집계 데이터.
 
 ### POST /api/v1/scan-runs
 
-ScanRun CR을 생성해 scan을 트리거한다. backend는 Mgmt k8s API에 ScanRun CR만 apply하고(PostgreSQL `scan_runs` 초기 row는 operator reconciler가 upsert)
-결과 id를 반환한다.
+ScanRun CR을 생성해 scan을 트리거한다.
+backend는 Mgmt k8s API에 ScanRun CR만 apply하고(PostgreSQL `scan_runs` 초기 row는 operator reconciler가
+upsert) 결과 id를 반환한다.
 
 **요청 body:**
 
@@ -248,13 +251,19 @@ ScanRun CR을 생성해 scan을 트리거한다. backend는 Mgmt k8s API에 Scan
 }
 ```
 
-**응답 `400`:** assessment_name 없음, targets 참조 오류 또는 profiles enum 형식 오류. (reconcile 단계에서만 발견되는 unknown profile은 HTTP 400으로 중복 거부하지 않고 ScanRun `status.features[]`에 `ConfigError`로 기록한 뒤 해당 profile만 무시한다.)
+**응답 `400`:** assessment_name 없음, targets 참조 오류 또는 profiles enum 형식 오류.
+(reconcile 단계에서만 발견되는 unknown profile은 HTTP 400으로 중복 거부하지 않고 ScanRun `status.features[]`에
+`ConfigError`로 기록한 뒤 해당 profile만 무시한다.)
 
 ---
 
 ### PATCH /api/v1/scan-runs/{id}/retry
 
-기존 ScanRun 안에서 선택 workflow만 재실행한다. 새 ScanRun을 만들지 않고 동일 id의 phase/finalDecision을 갱신한다. backend는 `ScanRun.spec`을 변경하지 않고 ScanRun `metadata.annotations`에 `security.kube-sentinel.io/retry-scope`(+ `retry-request-id`/`retry-requested-at`)를 patch하며, operator reconciler가 선택 phase만 재실행한 뒤 annotation을 observed 처리한다.
+기존 ScanRun 안에서 선택 workflow만 재실행한다.
+새 ScanRun을 만들지 않고 동일 id의 phase/finalDecision을 갱신한다.
+backend는 `ScanRun.spec`을 변경하지 않고 ScanRun `metadata.annotations`에
+`security.kube-sentinel.io/retry-scope`(+ `retry-request-id`/`retry-requested-at`)를 patch하며,
+operator reconciler가 선택 phase만 재실행한 뒤 annotation을 observed 처리한다.
 
 **요청 body:**
 
@@ -293,15 +302,18 @@ scope 동작:
 
 **응답 `400`:** `scope` 누락 또는 enum 형식 오류.
 **응답 `404`:** ScanRun 없음.
-**응답 `409`:** 해당 ScanRun이 `Canceled`이거나 선택 workflow가 이미 `Running`(이전 retry-scope annotation이 아직 observed 처리되지 않음).
+**응답 `409`:** 해당 ScanRun이 `Canceled`이거나 선택 workflow가 이미 `Running`(이전 retry-scope annotation이 아직
+observed 처리되지 않음).
 
-재실행으로 생성/갱신되는 finding은 PostgreSQL `findings`에 finding_id 기준 멱등 upsert되어 중복 집계되지 않는다(raw 정본=PostgreSQL, dedup 규칙은 DATABASE.md §findings).
+재실행으로 생성/갱신되는 finding은 PostgreSQL `findings`에 finding_id 기준 멱등 upsert되어 중복 집계되지 않는다(raw
+정본=PostgreSQL, dedup 규칙은 DATABASE.md §findings).
 
 ---
 
 ### GET /api/v1/scan-runs/{id}
 
-단건. list items와 동일 스키마.
+단건.
+list items와 동일 스키마.
 
 **응답 `404`:** ScanRun 없음.
 
@@ -309,7 +321,10 @@ scope 동작:
 
 ### GET /api/v1/scan-runs/{id}/status
 
-phase 폴링용 경량 엔드포인트. frontend는 5초마다 호출한다. `scan_runs` row의 정본 write 주체는 operator reconciler이므로, `POST /api/v1/scan-runs`로 CR을 apply한 직후 reconcile이 초기 row를 만들기 전까지는 `404 NOT_FOUND`를 반환할 수 있고 frontend는 이 초기 404를 일시적 상태로 처리하고 폴링을 계속한다.
+phase 폴링용 경량 엔드포인트.
+frontend는 5초마다 호출한다.
+`scan_runs` row의 정본 write 주체는 operator reconciler이므로, `POST /api/v1/scan-runs`로 CR을 apply한 직후
+reconcile이 초기 row를 만들기 전까지는 `404 NOT_FOUND`를 반환할 수 있고 frontend는 이 초기 404를 일시적 상태로 처리하고 폴링을 계속한다.
 
 **응답 `200`:**
 
@@ -323,7 +338,11 @@ phase 폴링용 경량 엔드포인트. frontend는 5초마다 호출한다. `sc
 }
 ```
 
-`final_decision`은 `phase = Completed`일 때만 non-null이며, `ScanRun.status.finalDecision.status`(`Pass`/`Fail`/`Warning`)를 평면화한 문자열(DATABASE `scan_runs.final_decision`과 동일)이다. 실패 근거 목록(`finalDecision.reasons[]`)은 이 경량 polling 응답에 포함하지 않고 `GET /api/v1/scan-runs/{id}` 및 Overview drill-down에서 제공한다.
+`final_decision`은 `phase = Completed`일 때만 non-null이며,
+`ScanRun.status.finalDecision.status`(`Pass`/`Fail`/`Warning`)를 평면화한 문자열(DATABASE
+`scan_runs.final_decision`과 동일)이다.
+실패 근거 목록(`finalDecision.reasons[]`)은 이 경량 polling 응답에 포함하지 않고 `GET /api/v1/scan-runs/{id}` 및
+Overview drill-down에서 제공한다.
 
 ---
 
@@ -388,7 +407,8 @@ phase 폴링용 경량 엔드포인트. frontend는 5초마다 호출한다. `sc
 
 ### GET /api/v1/scan-runs/{id}/findings/{findingId}
 
-단건. 위 items 스키마와 동일.
+단건.
+위 items 스키마와 동일.
 
 ---
 
@@ -430,7 +450,8 @@ phase 폴링용 경량 엔드포인트. frontend는 5초마다 호출한다. `sc
 
 ### GET /api/v1/scan-runs/{id}/health
 
-scan_health 기록. scanner 실패, unsupported target, stale baseline 등.
+scan_health 기록.
+scanner 실패, unsupported target, stale baseline 등.
 
 **쿼리 파라미터:**
 
@@ -515,10 +536,11 @@ Artifact Store에 저장된 파일 목록.
 ### GET /api/v1/scan-runs/{id}/artifacts/{artifactId}/download
 
 `artifact_index.id`로 식별되는 단일 Artifact Store 파일의 presigned download URL을 반환한다.
-`artifactId`는 `GET /api/v1/scan-runs/{id}/artifacts` 응답의 `items[].id`를 사용한다. 같은
-`artifact_type`(digest별 SBOM, verificationType별 integrity report 등)에 파일이 여러 개여도
-이 값으로 단일 파일을 선택한다. `artifact_type`은 list/filter 용도이며 download 식별자로
-쓰지 않는다. path convention은 [ARCHITECTURE.md](./ARCHITECTURE.md) §Artifact path convention을 따른다.
+`artifactId`는 `GET /api/v1/scan-runs/{id}/artifacts` 응답의 `items[].id`를 사용한다.
+같은 `artifact_type`(digest별 SBOM, verificationType별 integrity report 등)에 파일이 여러 개여도 이 값으로 단일 파일을
+선택한다.
+`artifact_type`은 list/filter 용도이며 download 식별자로 쓰지 않는다.
+path convention은 [ARCHITECTURE.md](./ARCHITECTURE.md) §Artifact path convention을 따른다.
 Filesystem store의 경우 backend가 stream proxy로 동작한다.
 
 **경로 파라미터:**
@@ -544,7 +566,8 @@ Filesystem store: `url`이 backend proxy 경로 (`/api/v1/artifacts/proxy/...`).
 
 ### GET /api/v1/exceptions
 
-예외 검토 목록. finding과 join해 finding 정보 포함.
+예외 검토 목록.
+finding과 join해 finding 정보 포함.
 
 **쿼리 파라미터:**
 
@@ -592,7 +615,8 @@ Filesystem store: `url`이 backend proxy 경로 (`/api/v1/artifacts/proxy/...`).
 
 ### PATCH /api/v1/exceptions/{id}
 
-예외 상태를 전환한다. status machine 위반 시 `409`를 반환한다.
+예외 상태를 전환한다.
+status machine 위반 시 `409`를 반환한다.
 
 **허용 전환:**
 
@@ -605,7 +629,9 @@ Filesystem store: `url`이 backend proxy 경로 (`/api/v1/artifacts/proxy/...`).
 | `Rejected` | `Required` | 재스캔에서 동일 finding 재보고 시 재평가(재신청 가능) |
 | `Expired` | `Required` | 재스캔/만료 후 동일 finding 재보고 시 재평가(재신청 가능) |
 
-`Rejected`/`Expired` → `Required` 전환은 재스캔 carry-over 재평가([DATABASE.md](./DATABASE.md) §exception_reviews 재스캔 carry-over 규칙)에 따라 operator가 새 ScanRun row를 만들 때 수행하며 사용자 PATCH로도 허용한다. 그 외 전환은 `409 CONFLICT`.
+`Rejected`/`Expired` → `Required` 전환은 재스캔 carry-over 재평가([DATABASE.md](./DATABASE.md)
+§exception_reviews 재스캔 carry-over 규칙)에 따라 operator가 새 ScanRun row를 만들 때 수행하며 사용자 PATCH로도 허용한다.
+그 외 전환은 `409 CONFLICT`.
 
 **요청 body:**
 
@@ -635,7 +661,8 @@ Filesystem store: `url`이 backend proxy 경로 (`/api/v1/artifacts/proxy/...`).
 
 ### GET /api/v1/governance/summary
 
-Governance 메뉴용 집계. 최근 ScanRun의 final decision 추이와 카테고리별 현황.
+Governance 메뉴용 집계.
+최근 ScanRun의 final decision 추이와 카테고리별 현황.
 
 **응답 `200`:**
 
@@ -682,7 +709,8 @@ Required → Requested → Approved → Expired
                      → Rejected
 ```
 
-재스캔으로 동일 `finding_id`가 새 ScanRun에 등장하면, 유효한 `Approved`(미만료)는 새 row로 carry-over하고 `Expired`/`Rejected`는 `Required`로 재평가한다(상세는 DATABASE.md §exception_reviews 재스캔 carry-over 규칙).
+재스캔으로 동일 `finding_id`가 새 ScanRun에 등장하면, 유효한 `Approved`(미만료)는 새 row로 carry-over하고
+`Expired`/`Rejected`는 `Required`로 재평가한다(상세는 DATABASE.md §exception_reviews 재스캔 carry-over 규칙).
 
 ### scan profiles enum
 
@@ -694,7 +722,11 @@ Required → Requested → Approved → Expired
 | `RBACAndSecretReference` | 적용된 RBAC & Secret 참조 스캔 | Biz Cluster Scan |
 | `BuildAndDeploy` | 빌드 & 배포 스캔 | Code / Artifact Scan |
 
-`profiles[]`는 base feature set을 결정하고 `features[]`가 enable/disable·config override를 적용한다. profile→registry feature ID 정본은 [ARCHITECTURE.md](./ARCHITECTURE.md) §Profile / features → registry feature ID 매핑이다. backend는 enum/참조 값 검증만 하고, 실제 병합·resolve와 unknown profile의 `ConfigError` 처리는 operator가 deterministic하게 수행한다.
+`profiles[]`는 base feature set을 결정하고 `features[]`가 enable/disable·config override를 적용한다.
+profile→registry feature ID 정본은 [ARCHITECTURE.md](./ARCHITECTURE.md) §Profile / features → registry
+feature ID 매핑이다.
+backend는 enum/참조 값 검증만 하고, 실제 병합·resolve와 unknown profile의 `ConfigError` 처리는 operator가
+deterministic하게 수행한다.
 
 ---
 
@@ -702,10 +734,13 @@ Required → Requested → Approved → Expired
 
 - **라우터**: `net/http` + `chi` 또는 `gorilla/mux`
 - **DB 쿼리**: `pgx/v5` 직접 또는 `sqlc` 코드 생성
-- **k8s 조회**: `k8s.io/client-go` dynamic client. `POST /api/v1/scan-runs`에서 ScanRun CR apply 시 사용
-- **CORS**: `frontend` origin 허용. backend middleware로 처리
-- **인증**: PoC 단계에서는 bearer token 또는 IP allowlist. 문서에 추후 정책 명시
-- **SSE**: `GET /api/v1/scan-runs/{id}/status` 는 현재 polling. Phase 2에서 SSE로 교체 예약
-- **raw-report 접근 제한**: dashboard에서 raw scanner 출력을 직접 렌더링할 때
-  Secret redaction guard를 통과한 데이터만 응답한다. backend handler에서
-  `findings/{findingId}/raw-report` 응답 전 재검증한다.
+- **k8s 조회**: `k8s.io/client-go` dynamic client.
+  `POST /api/v1/scan-runs`에서 ScanRun CR apply 시 사용
+- **CORS**: `frontend` origin 허용.
+  backend middleware로 처리
+- **인증**: PoC 단계에서는 bearer token 또는 IP allowlist.
+  문서에 추후 정책 명시
+- **SSE**: `GET /api/v1/scan-runs/{id}/status` 는 현재 polling.
+  Phase 2에서 SSE로 교체 예약
+- **raw-report 접근 제한**: dashboard에서 raw scanner 출력을 직접 렌더링할 때 Secret redaction guard를 통과한 데이터만 응답한다.
+  backend handler에서 `findings/{findingId}/raw-report` 응답 전 재검증한다.

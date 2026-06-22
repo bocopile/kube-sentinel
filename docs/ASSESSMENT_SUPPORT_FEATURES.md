@@ -1,19 +1,14 @@
 # Assessment Support Features
 
-이 문서는 최종점검 MVP에서 보안 취약점 자체를 탐지하는 scanner 외에,
-점검 결과의 신뢰도, 재현성, 증적성을 보장하기 위해 필요한 보조 기능을
-범위별로 분리한다.
+이 문서는 최종점검 MVP에서 보안 취약점 자체를 탐지하는 scanner 외에, 점검 결과의 신뢰도, 재현성, 증적성을 보장하기 위해 필요한 보조 기능을 범위별로 분리한다.
 
 1차 범위의 기준은 다음과 같다.
 
 - 고객사 인프라 적용 전 납품 산출물과 Biz Cluster 적용 설정을 점검한다.
 - 결과는 보고서, 증적, 예외 검토 항목으로 남긴다.
-- Biz Cluster의 애플리케이션 workload, RBAC, Service, Ingress, Secret을
-  자동 수정하지 않는다.
-- OSQuery, OTel, LGTM full stack, runtime event, long-running DaemonSet은
-  2차 확장으로 둔다.
-- Trivy Operator `VulnerabilityReport`는 2차 기능이 아니라 1차 선택
-  입력으로 유지한다.
+- Biz Cluster의 애플리케이션 workload, RBAC, Service, Ingress, Secret을 자동 수정하지 않는다.
+- OSQuery, OTel, LGTM full stack, runtime event, long-running DaemonSet은 2차 확장으로 둔다.
+- Trivy Operator `VulnerabilityReport`는 2차 기능이 아니라 1차 선택 입력으로 유지한다.
 
 ## 1차 필수 기능
 
@@ -30,8 +25,7 @@
 
 ## 1차 선택 기능
 
-1차 선택 기능은 MVP에 포함해도 범위가 과도하게 커지지 않지만, 구현 순서는
-필수 기능 뒤로 둔다.
+1차 선택 기능은 MVP에 포함해도 범위가 과도하게 커지지 않지만, 구현 순서는 필수 기능 뒤로 둔다.
 
 | 기능 | 목적 | 적용 기준 |
 |------|------|-----------|
@@ -60,16 +54,13 @@
 
 ## Trivy Operator VulnerabilityReport 정책
 
-Trivy Operator `VulnerabilityReport`는 유지한다. 단, 1차 범위에서의 역할은
-다음으로 제한한다.
+Trivy Operator `VulnerabilityReport`는 유지한다.
+단, 1차 범위에서의 역할은 다음으로 제한한다.
 
-- 기본 경로는 납품 이미지 registry digest 또는 image tar를 직접 scan하는
-  Code / Artifact Scan이다.
-- `VulnerabilityReport`는 Biz Cluster에 Trivy Operator가 이미 설치되어
-  있고, read-only 권한이 확인된 경우에만 보조 입력으로 사용한다.
-- `VulnerabilityReport`가 없거나 권한이 없다는 이유만으로 전체 scan을
-  실패 처리하지 않는다. 대신 `scan_health`에 optional input unavailable로
-  기록한다.
-- `VulnerabilityReport`의 결과는 delivery image scan 결과와 같은
-  `finding_id` 규칙으로 정규화하고 중복 집계하지 않는다.
+- 기본 경로는 납품 이미지 registry digest 또는 image tar를 직접 scan하는 Code / Artifact Scan이다.
+- `VulnerabilityReport`는 Biz Cluster에 Trivy Operator가 이미 설치되어 있고, read-only 권한이 확인된 경우에만 보조 입력으로
+  사용한다.
+- `VulnerabilityReport`가 없거나 권한이 없다는 이유만으로 전체 scan을 실패 처리하지 않는다.
+  대신 `scan_health`에 optional input unavailable로 기록한다.
+- `VulnerabilityReport`의 결과는 delivery image scan 결과와 같은 `finding_id` 규칙으로 정규화하고 중복 집계하지 않는다.
 - Trivy Operator 설치, 운영, 자동 remediation은 1차 범위에 포함하지 않는다.

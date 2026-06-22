@@ -1,7 +1,7 @@
 # 모듈 구조
 
-kube-sentinel은 모노레포 안에 3개의 독립 모듈로 구성된다. 각 모듈은 자체 빌드
-단위와 배포 단위를 가진다.
+kube-sentinel은 모노레포 안에 3개의 독립 모듈로 구성된다.
+각 모듈은 자체 빌드 단위와 배포 단위를 가진다.
 
 ## 모듈 개요
 
@@ -23,9 +23,9 @@ kube-sentinel/
 
 ## operator 모듈
 
-**역할**: Mgmt Cluster에 설치되는 단일 operator. CRD 정의, Reconciler, Feature
-orchestrator, remote apply, Finding normalization, PostgreSQL result write
-(raw_reports/findings), Report Artifact Store evidence write.
+**역할**: Mgmt Cluster에 설치되는 단일 operator.
+CRD 정의, Reconciler, Feature orchestrator, remote apply, Finding normalization, PostgreSQL result
+write (raw_reports/findings), Report Artifact Store evidence write.
 
 **Go module**: `github.com/bocopile/kube-sentinel/operator`
 
@@ -129,17 +129,17 @@ kubebuilder create api --group security --version v1alpha1 --kind ScanRun --name
 
 ## backend 모듈
 
-**역할**: REST API 서버. PostgreSQL 메타데이터 조회, k8s API 직접 조회(ClusterTarget ·
-ScanRun CR), Report Artifact Store read-only 조회, dashboard 응답 생성.
+**역할**: REST API 서버.
+PostgreSQL 메타데이터 조회, k8s API 직접 조회(ClusterTarget · ScanRun CR), Report Artifact Store read-only 조회,
+dashboard 응답 생성.
 
 **Go module**: `github.com/bocopile/kube-sentinel/backend`
 
-**k8s 접근 방식**: `k8s.io/client-go` dynamic client로 Mgmt Cluster API를 직접
-조회한다. CRD Go 타입은 operator 모듈과 공유하지 않고, backend가 필요한 필드만
-자체 경량 struct로 정의한다. Secret raw value는 조회하지 않는다.
+**k8s 접근 방식**: `k8s.io/client-go` dynamic client로 Mgmt Cluster API를 직접 조회한다.
+CRD Go 타입은 operator 모듈과 공유하지 않고, backend가 필요한 필드만 자체 경량 struct로 정의한다.
+Secret raw value는 조회하지 않는다.
 
-**ArtifactStore**: operator의 write 인터페이스 전체가 아닌 read-only 서브셋만
-자체 정의한다.
+**ArtifactStore**: operator의 write 인터페이스 전체가 아닌 read-only 서브셋만 자체 정의한다.
 
 ```go
 // backend/internal/artifactstore/store.go
@@ -204,8 +204,10 @@ go build ./...
 
 ## frontend 모듈
 
-**역할**: React SPA. Final Check Dashboard (Overview, Targets, Assessments, Findings,
-Reports, Governance). backend REST API만 호출한다. k8s API와 직접 통신하지 않는다.
+**역할**: React SPA.
+Final Check Dashboard (Overview, Targets, Assessments, Findings, Reports, Governance).
+backend REST API만 호출한다.
+k8s API와 직접 통신하지 않는다.
 
 **npm package**: `kube-sentinel-frontend`
 
@@ -285,9 +287,9 @@ npm run test
 └───────────────────────────────────────────────────────────────────┘
 ```
 
-operator · backend · frontend · PostgreSQL · Artifact Store 는 모두 Mgmt Cluster 에
-배포된다. Biz Cluster 에는 어떤 kube-sentinel 컴포넌트(operator/CRD/DB/backend/frontend)도
-설치하지 않으며, operator 의 remote apply 로 생성된 scanner Job·RBAC·namespace 만 존재한다.
+operator · backend · frontend · PostgreSQL · Artifact Store 는 모두 Mgmt Cluster 에 배포된다.
+Biz Cluster 에는 어떤 kube-sentinel 컴포넌트(operator/CRD/DB/backend/frontend)도 설치하지 않으며, operator 의 remote
+apply 로 생성된 scanner Job·RBAC·namespace 만 존재한다.
 
 | 통신 방향 | 방식 | 비고 |
 |----------|------|------|
