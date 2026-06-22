@@ -3,8 +3,9 @@
 kube-sentinel은 Mgmt Cluster 기반 Kubernetes 최종점검 보안 평가 PoC입니다.
 Mgmt Cluster는 이 솔루션이 설치되는 관리 클러스터이고, Biz Cluster는
 솔루션이 점검하는 업무/애플리케이션 클러스터입니다. 현재 리포지터리는
-계획 및 pre-skeleton 단계입니다. Go module과 구현 계약 문서는 존재하지만
-Kubebuilder controller skeleton은 아직 생성되지 않았습니다.
+계획 및 pre-skeleton 단계입니다. 3-모듈 모노레포(operator/, backend/, frontend/)를
+정본 구조로 삼으며, 임시 root `go.mod` placeholder와 구현 계약 문서는 존재하지만
+operator/ 등 모듈 디렉터리와 Kubebuilder controller skeleton은 아직 생성되지 않았습니다.
 
 ## 현재 범위
 
@@ -37,16 +38,18 @@ Biz Cluster에는 kube-sentinel operator를 실행하지 않으며 kube-sentinel
 
 현재 포함된 항목:
 
-- `go.mod`
+- `go.mod` (pre-skeleton 임시 root placeholder. 정본 module은 `operator/go.mod`이며, 첫 구현 PR(P0)에서 `operator/go.mod`로 대체하고 root `go.mod`는 제거합니다.)
 - `docs/` 아래 계획 및 아키텍처 문서
 
 아직 포함되지 않은 항목:
 
-- Kubebuilder `PROJECT`
-- `cmd/`
-- `api/`
-- `internal/`
-- `config/`
+- `operator/`, `backend/`, `frontend/` 모듈 디렉터리
+- `operator/go.mod`, `backend/go.mod`
+- Kubebuilder `operator/PROJECT`
+- `operator/cmd/`
+- `operator/api/`
+- `operator/internal/`
+- `operator/config/`
 
 ## 문서
 
@@ -77,9 +80,11 @@ Biz Cluster에는 kube-sentinel operator를 실행하지 않으며 kube-sentinel
 
 ## 다음 구현 단계
 
-첫 구현 PR은 Kubebuilder skeleton과 핵심 API 계약을 생성해야 합니다.
+첫 구현 PR은 `operator/` Kubebuilder skeleton과 핵심 API 계약을 생성해야 합니다.
+현재 root `go.mod`는 pre-skeleton placeholder이므로, 첫 PR에서 `operator/go.mod`를
+생성한 뒤 root `go.mod`를 제거합니다.
 
-- module을 `github.com/bocopile/kube-sentinel`로 초기화
+- operator 모듈을 `github.com/bocopile/kube-sentinel/operator`로 초기화
 - `ClusterTarget`, `SecurityAssessment`, `ScanRun` API 생성
 - build 가능한 reconciler skeleton 추가
 - feature registry interface 추가
@@ -88,6 +93,7 @@ Biz Cluster에는 kube-sentinel operator를 실행하지 않으며 kube-sentinel
 코드가 생성된 이후 예상 검증:
 
 ```bash
+cd operator
 go test ./...
 go build ./...
 ```

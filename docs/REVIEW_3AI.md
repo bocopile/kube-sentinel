@@ -20,12 +20,14 @@
 ## 1. CRITICAL — 구현 착수 차단 (최우선)
 
 ### [I-1] raw report·normalized findings 저장 정본 충돌 (PostgreSQL ↔ Artifact Store)
+> ✅ **해결됨** (3-AI 개별설계→교차검증→협의 후 적용): PostgreSQL `raw_reports`/`findings`=query 정본, Artifact Store=SBOM·evidence bundle·baseline·artifact-input·export 전용, `findings.jsonl`=evidence bundle용 immutable export로 ARCHITECTURE/MODULES/PROMPTS/AI_REMEDIATION/PLAN/REQUIREMENTS/ROADMAP/SECURITY_ASSESSMENT/FRONTEND 일괄 정렬.
 - **출처/검증**: X3 + U1(critical) + U12 — 만장일치 confirmed (ARCHITECTURE 내부 자기모순)
 - **근거**: ARCHITECTURE가 같은 문서 안에서 raw/normalized를 Artifact Store(mermaid line 87, line 410/447/651, "Normalized finding JSONL is the canonical" line 757)와 PostgreSQL(`raw_reports`/`findings`, line 783~785 "raw/ 경로는 Artifact Store에 없다")에 **동시 단언**. DATABASE는 PostgreSQL 정본. MODULES 통신표·PROMPTS P3는 "ArtifactStore write: raw scanner output". PROMPTS P3는 "ArtifactStore write … JSONB 또는 TEXT"로 한 문장 안에서도 모순.
 - **영향**: operator report writer, backend raw-report API, evidence bundle 구성, AI sidecar 입력이 모두 이 결정에 의존. P3(report store) 구현 자체가 막힘.
 - **합의 권고**: PostgreSQL `raw_reports`/`findings` = **query 정본**, Artifact Store = SBOM/evidence bundle/baseline/artifact-input 전용. `normalized/findings.jsonl`은 evidence bundle용 **export(파생)**으로 명문화. ARCHITECTURE mermaid·MODULES 통신표·PROMPTS P3·AI_REMEDIATION의 "canonical" 표현을 일괄 수정.
 
 ### [I-2] 3-모듈 구조 vs 루트 단일 go.mod 충돌
+> ✅ **해결됨** (3-AI 협의 후 적용): README/ORCHESTRATOR/PROMPTS를 3-모듈 정본으로 정렬. root `go.mod`는 pre-skeleton placeholder로 유지하고 "첫 PR(P0)에서 `operator/go.mod` 생성 후 root 제거"를 명시(go.mod 물리 변경은 P0 코드 작업).
 - **출처/검증**: X1 + U4 + C3 — 만장일치 confirmed
 - **근거**: README "다음 구현 단계"(line 82 "module을 `github.com/bocopile/kube-sentinel`로 초기화") + 실제 `go.mod` = 루트 단일 module. 그러나 MODULES/ORCHESTRATOR/PROMPTS = `operator/`,`backend/`,`frontend/` 3개 독립 모듈 + `github.com/bocopile/kube-sentinel/operator` + `cd operator && go test ./...`.
 - **영향**: 첫 구현 PR(P0)의 module path, Kubebuilder 실행 위치, 검증 명령이 정면 모순. README "리포지터리 상태"의 `cmd/`,`api/`,`internal/`,`config/` 목록도 모노레포에선 `operator/cmd` 등이어야 함.

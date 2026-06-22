@@ -7,8 +7,8 @@ kube-sentinel은 모노레포 안에 3개의 독립 모듈로 구성된다. 각 
 
 | 모듈 | 경로 | 언어 | Go module path | 역할 |
 |------|------|------|----------------|------|
-| operator | `operator/` | Go | `github.com/bocopile/kube-sentinel/operator` | Mgmt Cluster operator, CRD, Feature plugin, remote apply, ArtifactStore write |
-| backend | `backend/` | Go | `github.com/bocopile/kube-sentinel/backend` | REST API 서버, PostgreSQL query, k8s CR 조회, ArtifactStore read |
+| operator | `operator/` | Go | `github.com/bocopile/kube-sentinel/operator` | Mgmt Cluster operator, CRD, Feature plugin, remote apply, PostgreSQL result write, ArtifactStore evidence write |
+| backend | `backend/` | Go | `github.com/bocopile/kube-sentinel/backend` | REST API 서버, PostgreSQL query(raw report·finding 포함), k8s CR 조회, ArtifactStore read(SBOM·evidence·export) |
 | frontend | `frontend/` | TypeScript | `kube-sentinel-frontend` (npm) | Final Check Dashboard, React SPA |
 
 ```
@@ -24,7 +24,8 @@ kube-sentinel/
 ## operator 모듈
 
 **역할**: Mgmt Cluster에 설치되는 단일 operator. CRD 정의, Reconciler, Feature
-orchestrator, remote apply, Finding normalization, Report Artifact Store write.
+orchestrator, remote apply, Finding normalization, PostgreSQL result write
+(raw_reports/findings), Report Artifact Store evidence write.
 
 **Go module**: `github.com/bocopile/kube-sentinel/operator`
 
@@ -264,9 +265,9 @@ npm run test
 │  Mgmt Cluster   (kube-sentinel solution is deployed here)         │
 │                                                                   │
 │   - operator        CRD, reconciler, feature orchestrator,        │
-│                     normalizer, remote apply, ArtifactStore write │
-│   - PostgreSQL      metadata: scan_run, finding, artifact_index   │
-│   - Artifact Store  raw report, normalized JSONL, SBOM, evidence  │
+│                     normalizer, remote apply, PG + evidence write │
+│   - PostgreSQL      scan_run, raw_report, finding, artifact_index │
+│   - Artifact Store  SBOM, baseline, evidence bundle, export       │
 │   - backend         REST API server, k8s dynamic client, PG read  │
 │   - frontend        React SPA, Final Check Dashboard              │
 │                                                                   │
@@ -288,8 +289,8 @@ operator · backend · frontend · PostgreSQL · Artifact Store 는 모두 Mgmt 
 
 | 통신 방향 | 방식 | 비고 |
 |----------|------|------|
-| operator → PostgreSQL | `lib/pq` 또는 `pgx` | finding, scan_run, artifact_index write |
-| operator → Artifact Store | ArtifactStore interface | raw report, JSONL, evidence bundle write |
+| operator → PostgreSQL | `lib/pq` 또는 `pgx` | raw_report, finding, scan_run, scan_health, final_decision, artifact_index write |
+| operator → Artifact Store | ArtifactStore interface | SBOM, scanner baseline, artifact-input manifest, exported report, evidence bundle write |
 | backend → PostgreSQL | `pgx` | read-only query |
 | backend → Artifact Store | ArtifactReader interface | GetArtifact, GenerateDownloadURL |
 | backend → Mgmt k8s API | dynamic client | ClusterTarget, ScanRun CR get/list/create |

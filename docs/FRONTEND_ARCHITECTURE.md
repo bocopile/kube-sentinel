@@ -136,7 +136,7 @@ Scanner / Cluster Inspector
   -> Finding Normalizer
   -> Normalized findings
   -> Final decision summary
-  -> Report Metadata Store + Report Artifact Store
+  -> PostgreSQL raw_reports / findings (query 정본) + Artifact Store evidence exports
   -> Evidence Bundle
   -> Final Check Dashboard
 ```
@@ -148,13 +148,13 @@ Dashboard
   -> assessment-api
   -> PostgreSQL metadata query
   -> artifact reference lookup
-  -> raw report / SBOM / evidence bundle download
+  -> SBOM / evidence bundle / exported report download
 ```
 
-Dashboard 목록, 필터, 집계는 metadata store에서 조회한다. 원본 scanner
-report, SBOM, final report, evidence bundle은 artifact store의 stable path를
-참조해 다운로드한다. metadata store는 조회 최적화용이며, 필요 시 artifact
-store의 `manifest.json`과 normalized JSONL에서 재생성할 수 있어야 한다.
+Dashboard 목록, 필터, 집계와 raw scanner report·normalized finding 조회는 PostgreSQL
+`raw_reports`/`findings`에서 수행한다. SBOM, exported report, evidence bundle은 artifact
+store의 stable path를 참조해 다운로드한다. PostgreSQL이 query 정본이며, artifact store의
+`manifest.json`은 `artifact_index` 재생성에만 사용하고 raw/finding 정본을 대체하지 않는다.
 
 ## Workflow View
 
@@ -178,7 +178,7 @@ Code / Artifact 실패와 Biz Cluster 실패를 같은 실패로 보지 않고, 
 |-----|------|
 | `assessment-api` | scan run, finding, exception, 최종 판정 결과 조회 |
 | `scanner-runner` | 검사 profile 실행 요청과 상태 추적 |
-| `artifact-store` | raw report, SBOM, normalized finding, dashboard snapshot 저장 |
+| `artifact-store` | SBOM, scanner baseline, evidence bundle, exported report 저장 (raw report·normalized finding은 PostgreSQL) |
 | `exception-store` | 예외 승인 이력, 만료일, 승인자, 사유 저장 |
 
 ## State Model
@@ -190,7 +190,7 @@ Code / Artifact 실패와 Biz Cluster 실패를 같은 실패로 보지 않고, 
 | Finding | normalized finding. category, scanner, target, severity, status를 가진다. |
 | FinalDecision | scan run별 최종 Pass/Fail/Warning 판정과 주요 실패 원인 목록. |
 | ExceptionReview | finding별 예외 승인 상태, 승인자, 사유, 만료일. |
-| Artifact | raw report, SBOM, digest verification report, normalized finding JSONL, exported report. |
+| Artifact | SBOM, digest verification report, scanner baseline, evidence bundle, exported report. raw report와 normalized finding은 PostgreSQL에서 조회한다. |
 | EvidenceBundle | raw report, normalized findings, scan health, final decision, exception candidates를 묶은 검수 증적. |
 
 ## UI Guardrails

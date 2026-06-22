@@ -9,7 +9,7 @@ test 가능한 상태여야 한다.
 | --- | --- | --- |
 | S0 | Assessment prerequisite | Mgmt namespace, Biz Cluster kubeconfig Secret, target preflight, bootstrap policy, read-only RBAC, image access, report store write test 통과 |
 | S0.5 | Delivery artifact security assessment baseline | SAST, Secret, Image, SBOM, Integrity, Manifest/RBAC, Dockerfile, Script, artifact input manifest, scanner baseline, scan health report 생성 및 정규화 |
-| S1 | Report store와 finding schema spike | Security Assessment/Trivy fixture가 normalized finding, stable finding ID, metadata record, report artifact, evidence bundle로 변환 |
+| S1 | Report store와 finding schema spike | Security Assessment/Trivy fixture가 PostgreSQL `raw_reports`/`findings`, stable finding ID, metadata record, evidence export artifact, evidence bundle로 변환 |
 | S2 | Mgmt 단일 operator와 assessment vertical slice | `ClusterTarget`, `SecurityAssessment`, `ScanRun`이 Feature orchestrator/registry, remote apply/read-only inspection으로 assessment Job과 report record 생성 |
 | S3 | 나머지 assessment capability | Trivy delivery image scan과 applied cluster config scan을 각각 enable/disable, assess, verify 가능 |
 | S4 | Final-check validation과 dashboard | Delivery artifact scan, applied cluster configuration scan, dashboard, report, exception review 통과 |
@@ -21,7 +21,7 @@ test 가능한 상태여야 한다.
 | --- | --- | ---: | --- |
 | M0 | Assessment readiness check | 1일 | Mgmt namespace, Biz Cluster kubeconfig Secret, target preflight, bootstrap policy, read-only RBAC, image access, report store write test 통과 |
 | M0.5 | Delivery artifact security assessment baseline | 1일 | required artifact, artifact input manifest, scanner version, vulnerability DB baseline, image access, digest list, scan health report 검증 |
-| M1 | Report store와 dashboard backend | 1-2일 | report artifact, stable ID가 있는 normalized finding, metadata index, Artifact Store backend plugin, scan health, final decision record, evidence bundle, 기본 dashboard retrieval view 동작 |
+| M1 | Report store와 dashboard backend | 1-2일 | PostgreSQL `raw_reports`/`findings`, stable ID가 있는 normalized finding, metadata index, Artifact Store backend plugin, scan health, final decision record, evidence bundle, 기본 dashboard retrieval view 동작 |
 | M2 | Mgmt operator core + Feature orchestrator scaffold | 3-4일 | ClusterTarget/SecurityAssessment/ScanRun CRD, feature registry, feature orchestrator, desired state store, remote apply, bootstrap policy, SSA, finalizer, report writer, assessment scaffold 동작 |
 | M3 | Security Assessment feature | 2-3일 | delivery artifact scanner report가 scan health를 포함한 normalized finding으로 변환 |
 | M4 | Applied cluster configuration scan | 2일 | read-only cluster inspection이 Workload, RBAC, ServiceAccount, Secret reference 위험을 보고 |

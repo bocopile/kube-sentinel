@@ -6,9 +6,10 @@ project를 대상으로 하며, kube-sentinel은 Go Kubernetes operator다.
 
 ## 현재 bootstrap 상태
 
-이 리포지터리는 pre-skeleton Go 상태다. `go.mod`와 계획 문서는 존재하지만
-Kubebuilder가 생성한 `cmd/`, `api/`, `internal/`, `config/`, `PROJECT`,
-`.orchestrator/config.yaml` 파일은 아직 없다.
+이 리포지터리는 pre-skeleton Go 상태다. 임시 root `go.mod`(첫 PR에서 `operator/go.mod`로
+대체·제거 예정)와 계획 문서는 존재하지만 3-모듈 정본의 `operator/go.mod`와 Kubebuilder가
+생성한 `operator/cmd/`, `operator/api/`, `operator/internal/`, `operator/config/`,
+`operator/PROJECT`, `.orchestrator/config.yaml` 파일은 아직 없다.
 
 따라서 유효한 실행 방식은 두 가지다.
 
@@ -45,6 +46,7 @@ operator workflow에 추가로 필요한 항목:
 
 ```bash
 # 1. operator 모듈 초기화 (최초 1회)
+mkdir -p operator
 cd operator/
 kubebuilder init --domain kube-sentinel.io --repo github.com/bocopile/kube-sentinel/operator
 kubebuilder create api --group security --version v1alpha1 --kind ClusterTarget --namespaced=false
@@ -69,7 +71,7 @@ orchestrator init --project . --yes
 ```
 
 이미 초기화된 repo에서 생성 파일을 확인하지 않고 Kubebuilder command를 두 번
-실행하지 않는다. `go.mod`, `PROJECT`, `api/`, `config/`가 이미 존재하면
+실행하지 않는다. `operator/go.mod`, `operator/PROJECT`, `operator/api/`, `operator/config/`가 이미 존재하면
 재초기화하지 말고 해당 상태에 맞는 prompt부터 이어서 진행한다.
 
 그 다음 milestone별로 orchestrator를 실행한다.
@@ -107,8 +109,8 @@ Build kube-sentinel.
 이 리포지터리의 orchestrator config는 Go command를 사용해야 한다.
 
 ```bash
-go test ./...
-go build ./...
+(cd operator && go test ./... && go build ./...)
+(cd backend  && go test ./... && go build ./...)
 ```
 
 Cluster stage는 milestone request에 명시적인 manual check를 추가해야 한다.
@@ -126,6 +128,6 @@ kubectl --context biz-a get job,cronjob,cm,sa,role,rolebinding -n kube-sentinel-
 command는 kube-sentinel CRD, controller log, status를 확인한다. Biz Cluster
 command는 remote apply된 resource와 read-only scan target만 확인한다.
 
-Report stage는 raw report artifact, normalized finding record, scan health
+Report stage는 PostgreSQL `raw_reports` record, normalized finding record, scan health
 summary, final decision record, evidence bundle, dashboard screenshot에 대한
 구체적인 검증을 포함해야 한다.

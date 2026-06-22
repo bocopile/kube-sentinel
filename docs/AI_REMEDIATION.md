@@ -189,14 +189,14 @@ artifact path convention에 sidecar를 추가한다.
 
 ```text
 reports/<assessment-name>/<scan-run-id>/
-  normalized/findings.jsonl                 # core, AI 미반영 (불변)
-  normalized/final-decision.json            # AI 입력 금지 (불변)
+  normalized/findings.jsonl                 # findings 테이블에서 export한 evidence bundle snapshot (immutable), AI 미반영
+  normalized/final-decision.json            # scan_runs.summary에서 export한 snapshot, AI 입력 금지
   normalized/remediation-advisory.jsonl     # AI 출력 (sidecar, finding_id 링크)
   normalized/remediation-provenance.json    # provenance
 ```
 
-`findings.jsonl`의 `remediation` 필드는 정적 catalog 값으로 유지한다. AI 결과는
-`remediation-advisory.jsonl`에서 `finding_id`로 join한다.
+정본 `findings.remediation`(PostgreSQL) 및 그로부터 export된 `findings.jsonl`의 `remediation`
+필드는 정적 catalog 값으로 유지한다. AI 결과는 `remediation-advisory.jsonl`에서 `finding_id`로 join한다.
 
 ## Provenance와 재현성
 

@@ -105,6 +105,7 @@ P0에서는 operator/ 모듈 skeleton만 생성한다.
 
 operator/ 초기화 (operator/ 디렉터리 안에서):
 - Go module: github.com/bocopile/kube-sentinel/operator
+- 기존 root `go.mod`가 있으면 `operator/go.mod` 생성 후 root `go.mod`를 제거한다. root module path `github.com/bocopile/kube-sentinel`는 구현 정본으로 사용하지 않는다.
 - Kubebuilder 초기화 도메인: kube-sentinel.io
 - CRD: ClusterTarget, SecurityAssessment, ScanRun (모두 cluster-scoped)
 - api/v1alpha1 아래 ClusterTarget, SecurityAssessment, ScanRun API type 추가.
@@ -219,8 +220,11 @@ operator/ 범위:
   finding_id 생성 규칙: docs/DATABASE.md findings 테이블 참조.
 - report, log, dashboard record, artifact 대상 Secret redaction guard.
 - evidence bundle export 구조.
-- ArtifactStore write: raw scanner output을 JSONB 또는 TEXT로 저장하는
-  raw_report writer (docs/DATABASE.md raw_reports 테이블 스키마 기준).
+- PostgreSQL write: raw scanner output을 JSONB 또는 TEXT로 `raw_reports` 테이블에 저장하는
+  raw_report writer (docs/DATABASE.md raw_reports 테이블 스키마 기준). normalized findings JSONL은
+  evidence bundle export 시 `findings` 테이블에서 생성한다.
+- ArtifactStore write: SBOM, scanner baseline, artifact-input manifest, exported report,
+  evidence bundle 같은 파생·증적 산출물만 저장한다.
 
 backend/ 범위:
 

@@ -84,8 +84,8 @@ flowchart LR
     bootstrap --> ns
     bootstrap --> rbac
     orchestrator -->|"Apply scan resources"| scanners
-    scanners -->|"Raw reports"| artifact_store
-    orchestrator -->|"Normalized findings / decisions"| metadata_store
+    scanners -->|"Raw reports"| orchestrator
+    orchestrator -->|"Raw reports / normalized findings / decisions"| metadata_store
     orchestrator -->|"Evidence bundle / exports"| artifact_store
     artifact_store -->|"Artifact refs"| metadata_store
     metadata_store --> assessment_api
@@ -136,7 +136,7 @@ as a valid final-check baseline.
 | Utility CLI | `jq` | `1.8.1` validated | JSON report and status processing in scripts. |
 | Utility CLI | `yq` | `v4.53.3` validated | YAML manifest, Helm values, and artifact input processing. |
 | Result metadata | PostgreSQL | `18.x` recommended for product mode | Queryable index for ScanRun, Finding, FinalDecision, ExceptionReview, artifact metadata, and dashboard filters. |
-| Result artifact | Artifact Store backend plugin | deployment-specific | raw report, SBOM, normalized finding file, evidence bundle, exported report를 저장하는 추상화 계층. 특정 backend에 고정하지 않는다. |
+| Result artifact | Artifact Store backend plugin | deployment-specific | SBOM, evidence bundle, scanner baseline, artifact-input manifest, exported human report 같은 파생·증적 산출물을 저장하는 추상화 계층. raw report와 normalized finding의 query 정본은 PostgreSQL이며 Artifact Store에 두지 않는다. 특정 backend에 고정하지 않는다. |
 
 ### First-scope scanner baseline
 
@@ -181,8 +181,10 @@ type ArtifactStore interface {
 | NFS/PVC | 단순 내부망 배포와 폐쇄망 PoC |
 | OCI artifact | 향후 evidence bundle 배포/보관 후보 |
 
-Metadata DB는 dashboard/API 조회 최적화를 담당하고, Artifact Store는 감사와
-재현성을 위한 원본 증적을 보관한다. 어떤 backend를 사용하더라도 artifact
+Metadata DB(PostgreSQL)는 raw scanner output, normalized finding, scan health,
+final decision의 query 정본을 담당하고, Artifact Store는 감사와 재현성을 위한
+파생·증적 산출물(SBOM, evidence bundle, scanner baseline, artifact-input manifest,
+exported report)을 보관한다. 어떤 backend를 사용하더라도 artifact
 path, checksum, schema version, scanner baseline metadata는 동일하게 유지한다.
 
 ### Optional first-scope inputs
@@ -225,7 +227,7 @@ Each Biz Cluster must provide:
 | target kubeconfig or ServiceAccount token | Stored in the Mgmt Cluster and used by the management controller for remote apply. |
 | bootstrap RBAC | Grants only the verbs/resources needed by enabled features. |
 | image pull access | Pull scanner images when remote scanner Jobs are enabled. |
-| report store access | Persist raw reports, normalized findings, evidence bundles, and final decisions. |
+| report store access | Persist raw reports, normalized findings, and final decisions in PostgreSQL; evidence bundles and exports in the Artifact Store. |
 | capability declaration | Records whether scanner Jobs, read-only inspection, registry access, and report upload are available. |
 
 Required target RBAC should be split by capability:
@@ -405,9 +407,9 @@ spec:
 | Remote apply client | Uses target kubeconfig Secrets to apply resources to Biz Clusters. |
 | Security assessment feature | Runs delivery artifact and applied cluster configuration scans, normalizes findings, and records scan health. |
 | Trivy integration | Runs delivery image scans and optionally reads Trivy Operator VulnerabilityReports when the CRD exists in a Biz Cluster. |
-| Report store | Stores raw reports, normalized findings, scan health, final decisions, and evidence bundles. |
-| Report metadata store | Stores queryable ScanRun, Finding, FinalDecision, ExceptionReview, and artifact index records for dashboard/API retrieval. |
-| Report artifact store | Stores raw scanner reports, SBOMs, digest reports, normalized finding files, exported reports, and evidence bundles. |
+| Report store | Stores raw reports, normalized findings, scan health, and final decisions in PostgreSQL; evidence bundles and other artifacts live in the Artifact Store. |
+| Report metadata store | Stores queryable ScanRun, raw_reports, Finding, ScanHealth, FinalDecision, ExceptionReview, and artifact index records for dashboard/API retrieval. |
+| Report artifact store | Stores SBOMs, digest reports, scanner baselines, artifact input manifests, exported reports, and evidence bundles. raw scanner reports and normalized findings are stored in PostgreSQL, not here. |
 | Assessment API | Reads report metadata and artifact references for dashboard, report download, and review workflows. |
 | Dashboard model | Provides one Final Check Dashboard with Overview, Targets, Assessments, Findings, Reports, and Governance views. |
 
@@ -444,10 +446,10 @@ full LGTM stack for the first MVP.
 
 The first MVP stores assessment outputs in a split Report Store:
 
-- Report Artifact Store for raw scanner reports, normalized JSONL files, SBOMs,
-  integrity reports, exported human reports, and evidence bundles.
-- Report Metadata Store for queryable ScanRun, Finding, ScanHealth,
-  FinalDecision, ExceptionReview, and artifact index records.
+- Report Metadata Store (PostgreSQL) for queryable ScanRun, raw_reports, Finding,
+  ScanHealth, FinalDecision, ExceptionReview, and artifact index records.
+- Report Artifact Store for SBOMs, integrity reports, scanner baselines,
+  artifact input manifests, exported human reports, and evidence bundles.
 - Assessment API for loading metadata records, resolving artifact references,
   and serving dashboard/report download requests.
 
@@ -533,10 +535,11 @@ ConfigError로 처리한다.
 12. local runner 또는 remote scanner Job에서 raw report를 수집한다.
 13. feature별 `Collect()`로 artifact reference를 수집한다.
 14. feature별 `Normalize()`로 normalized finding과 scan health를 생성한다.
-15. immutable raw report, SBOM, normalized JSONL, final-decision JSON,
-    exception review artifact, evidence bundle을 Report Artifact Store에 기록한다.
-16. queryable ScanRun, Finding, ScanHealth, FinalDecision, ExceptionReview,
-    artifact index row를 Report Metadata Store에 upsert한다.
+15. queryable ScanRun, raw scanner output(`raw_reports`), normalized finding(`findings`),
+    scan health, final decision, exception review row를 PostgreSQL Report Metadata Store에 upsert한다.
+16. SBOM, scanner baseline, artifact-input manifest, exported report, evidence bundle 같은
+    파생·증적 산출물을 Report Artifact Store에 기록하고 `artifact_index` row를 upsert한다.
+    evidence bundle 생성 시 `findings`에서 `normalized/findings.jsonl` immutable snapshot을 export한다.
 17. disabled/stale remote resource를 label 기반으로 GC한다.
 18. Code / Artifact Scan과 Biz Cluster Scan 결과를 상관 분석한다.
 19. Evidence Bundle과 Exception Review 후보를 생성한다.
@@ -648,8 +651,8 @@ the evidence; the metadata layer serves dashboard/API queries.
 
 | Source | Input path | Artifact Store write | Metadata Store write | Decision phase |
 | --- | --- | --- | --- | --- |
-| Trivy | Delivery image scan report from registry digest, image tar, or optional VulnerabilityReport | raw Trivy report, SBOM, integrity report, normalized `findings.jsonl` | `image_vulnerability`, `sbom`, `integrity` finding rows and artifact references | Discovery / Priority |
-| Security Assessment | Scanner reports and applied cluster configuration snapshot | raw scanner reports, applied snapshot, normalized `findings.jsonl`, scan health JSON, evidence bundle | `sast`, `secret`, `kubernetes`, `rbac`, `dockerfile`, `script`, `scan_health`, final decision, exception review rows | Discovery / Priority / Validation |
+| Trivy | Delivery image scan report from registry digest, image tar, or optional VulnerabilityReport | SBOM, integrity report, evidence bundle export | `raw_reports`, `image_vulnerability`, `sbom`, `integrity` finding rows and artifact references | Discovery / Priority |
+| Security Assessment | Scanner reports and applied cluster configuration snapshot | applied snapshot, scanner baseline, evidence bundle export | `raw_reports`, `sast`, `secret`, `kubernetes`, `rbac`, `dockerfile`, `script`, `scan_health`, final decision, exception review rows | Discovery / Priority / Validation |
 | Final report | Final decision and linked evidence | Markdown/PDF/HTML export and evidence bundle | report index row with artifact references | Validation / Exception Review |
 
 Dashboard menus should be decision-oriented. Scanner categories should appear as
@@ -674,16 +677,17 @@ backend 중 하나로 붙일 수 있다.
 
 Required defaults:
 
-- Store raw scanner reports separately from normalized findings.
-- Store normalized findings with stable `finding_id` values.
+- Store raw scanner reports in PostgreSQL `raw_reports`, separate from normalized findings.
+- Store normalized findings in PostgreSQL `findings` with stable `finding_id` values.
 - Store scan health records for scanner errors, skipped scans, unsupported
   targets, stale DB/rule baselines, and missing artifacts.
 - Store final decision summaries with links to the ScanRun, target, artifacts,
   exception candidates, and evidence bundle.
 - Do not store raw Secret values.
 - Keep report artifact paths stable across dashboard, export, and audit views.
-- Treat dashboard records as read models derived from report artifacts, not as
-  the only copy of the assessment result.
+- Treat dashboard records as read models derived from PostgreSQL query tables;
+  evidence bundle exports are immutable snapshots, not the only copy of the
+  assessment result.
 
 ### Result storage format
 
@@ -754,7 +758,7 @@ scanner별 저장 포맷:
 | Cosign/Notation | JSON | `json` | verification result |
 | Crane | JSON | `json` | digest metadata |
 
-Normalized finding JSONL is the canonical machine-readable finding artifact.
+Normalized `findings.jsonl` is an evidence-bundle export generated from PostgreSQL `findings`; PostgreSQL `findings` is the canonical query source.
 Each line must contain at least:
 
 ```json

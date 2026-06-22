@@ -16,7 +16,7 @@ Cluster를 등록하고, 납품 산출물 보안 평가를 실행하며, remote 
 | G1 | `ClusterTarget`와 `SecurityAssessment` CR을 생성하면 management controller가 선택된 Biz Cluster에 활성화된 assessment workload를 생성한다. | Mgmt Cluster에서 `kubectl get clustertarget,securityassessment,scanrun`, Biz Cluster target namespace에서 `kubectl get job,cronjob,cm,sa,role,rolebinding` 확인 |
 | G2 | Feature toggle은 feature별 managed resource를 생성하거나 제거한다. | `spec.features[].enabled` patch 후 resource 생성/삭제 확인 |
 | G3 | allowlist 기반 scan resource config로 선택된 scan Job의 resource와 scheduling field를 변경할 수 있다. | `spec.scanResources` patch 후 생성된 workload spec과 거부된 금지 field 확인 |
-| G4 | Trivy와 security assessment data는 report artifact와 dashboard record로 정규화된다. | normalized finding, scan health, report artifact 검토 |
+| G4 | Trivy와 security assessment data는 PostgreSQL query record와 evidence/export artifact로 정규화된다. | `raw_reports`, `findings`, scan health, evidence/export artifact 검토 |
 | G5 | Dashboard view는 finding, vulnerability, scan health, final-check security assessment 결과를 노출한다. | dashboard screenshot 캡처 |
 | G6 | Final Check Dashboard는 의사결정 중심 메뉴로 assessment result를 노출한다. | dashboard screenshot 캡처 |
 | G7 | scope, discovery, priority, validation, exception review에 대한 evidence/decision mapping이 통과한다. | evidence bundle, final decision summary, exception review artifact 검토 |
@@ -60,8 +60,8 @@ G1~G19는 1차 필수 성공 기준이다. G20/G21은 AI remediation advisor opt
 - feature readiness, config error, apply error, degraded runtime state에 대한 status reporting
 - raw scanner output, normalized finding, scan health, final decision,
   exception candidate를 위한 Report Store와 Evidence Bundle 생성
-- immutable artifact, normalized JSONL/JSON document, metadata index, stable
-  artifact reference, dashboard/API read model을 이용한 결과 저장 및 조회
+- PostgreSQL `raw_reports`/`findings` 정본, evidence bundle용 normalized JSONL/JSON export,
+  metadata index, stable artifact reference, dashboard/API read model을 이용한 결과 저장 및 조회
 - Filesystem, S3-compatible, MinIO, SeaweedFS, NFS/PVC 등으로 교체 가능한
   Artifact Store backend plugin interface
 - source, secret, image, SBOM, integrity, Kubernetes manifest, RBAC,
@@ -90,8 +90,8 @@ G1~G19는 1차 필수 성공 기준이다. G20/G21은 AI remediation advisor opt
   `ClusterTarget.spec.bootstrapPolicy`가 허용한 kube-sentinel 전용 리소스만
   생성한다.
 - Report Store와 Dashboard storage는 Mgmt Cluster 안에 있거나 Mgmt Cluster에서 접근 가능하다.
-- report metadata storage는 dashboard/API filtering에 사용할 수 있으며 필요 시
-  report artifact에서 재생성할 수 있다.
+- dashboard/API filtering은 PostgreSQL `raw_reports`/`findings`/summary records를 사용한다.
+  Artifact Store의 `manifest.json`은 `artifact_index` 재생성에만 사용하며 raw/finding 정본을 대체하지 않는다.
 - image scanner와 필요한 scanner image는 선택된 runner에서 설치 또는 실행 가능하다.
 - Biz Cluster는 승인된 namespace와 applied configuration assessment에 필요한
   cluster-level RBAC resource 범위의 read-only credential로 조회할 수 있다.
