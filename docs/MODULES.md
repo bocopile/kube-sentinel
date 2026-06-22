@@ -291,7 +291,7 @@ operator · backend · frontend · PostgreSQL · Artifact Store 는 모두 Mgmt 
 
 | 통신 방향 | 방식 | 비고 |
 |----------|------|------|
-| operator → PostgreSQL | `lib/pq` 또는 `pgx` | raw_report, finding, scan_run, scan_health, final_decision, artifact_index write |
+| operator → PostgreSQL | `lib/pq` 또는 `pgx` | scan_run, cluster_target mirror, raw_report, finding, scan_health, final_decision, exception_review, artifact_index write |
 | operator → Artifact Store | ArtifactStore interface | SBOM, scanner baseline, artifact-input manifest, exported report, evidence bundle write |
 | backend → PostgreSQL | `pgx` | read-only query |
 | backend → Artifact Store | ArtifactReader interface | GetArtifact, GenerateDownloadURL |

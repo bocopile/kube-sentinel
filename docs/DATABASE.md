@@ -34,7 +34,7 @@ PostgreSQL을 선택한 이유:
 ### scan_runs
 
 ScanRun 하나의 실행 단위. `summary` JSONB에 집계 카운터를 선계산해 Overview API
-응답을 빠르게 한다.
+응답을 빠르게 한다. `scan_runs` row 생성/갱신의 정본 write 주체는 operator `ScanRun` reconciler다. backend `POST /api/v1/scan-runs`는 Mgmt k8s API에 ScanRun CR만 apply하고 PostgreSQL `scan_runs`를 insert하지 않는다. operator는 reconcile 시작 시 `Pending` 초기 row를 upsert하고 이후 phase/final_decision/summary를 갱신한다.
 
 ```sql
 CREATE TABLE scan_runs (
@@ -258,6 +258,13 @@ CREATE INDEX idx_exceptions_scanrun    ON exception_reviews(scan_run_id);
 - `expires_at < now()` 이면 background job이 `status = 'Expired'`로 전환하고
   `findings.exception_status`도 갱신한다.
 
+재스캔 carry-over 규칙(같은 `finding_id`가 새 ScanRun에서 다시 보고될 때, operator가 적용):
+
+- 직전 ScanRun에서 `Approved`이고 `expires_at`이 아직 유효하면 새 finding의 `exception_status`를 `Approved`로 carry-over하고 `exception_reviews` row(owner/reason/expires_at/approved_by/approved_at)를 같은 `finding_id`/새 `scan_run_id`로 복제한다.
+- 직전 상태가 `Expired` 또는 `Rejected`이거나 `Approved`라도 `expires_at < now()`이면 carry-over하지 않고 새 finding을 `Required`로 재평가한다(다시 승인 절차를 거친다).
+- 직전 `Requested`(미결)는 carry-over하지 않고 새 ScanRun에서 `Required`로 시작한다.
+- finding이 재스캔에서 사라지면(해결됨) 새 row를 만들지 않는다.
+
 ---
 
 ### artifact_index
@@ -291,8 +298,8 @@ CREATE INDEX idx_artifact_index_path    ON artifact_index(path);
 
 ### cluster_targets
 
-ClusterTarget CR의 k8s 미러. k8s watch 이벤트로 동기화한다. dashboard Targets
-메뉴의 list/get 응답 속도를 보장한다.
+ClusterTarget CR의 k8s 미러. operator `ClusterTarget` reconciler/watch가 PostgreSQL `cluster_targets`를 upsert(정본 write 주체)하며, backend는 read-only query로만 사용한다. dashboard Targets
+메뉴의 list/get 응답 속도를 보장한다. 미러 row가 아직 없는 ClusterTarget은 backend가 k8s API 직접 조회로 fallback하거나 `404 NOT_FOUND`를 반환한다.
 
 ```sql
 CREATE TABLE cluster_targets (

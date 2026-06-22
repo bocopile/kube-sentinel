@@ -17,7 +17,7 @@ G1~G19를 구현 관점에서 옮긴 것이며, AI advisor 관련 G20/G21은 REQ
 
 | # | 성공 기준 | 검증 방법 |
 |---|----------|----------|
-| G1 | `ClusterTarget`와 `SecurityAssessment` CR을 생성하면 management controller가 Code / Artifact Scan은 Mgmt-local Job으로 실행하고, Biz Cluster Scan은 read-only inspection(옵션으로 허용된 remote scanner Job)으로 실행한다. | Mgmt Cluster에서 `kubectl get clustertarget,securityassessment,scanrun`과 Mgmt-local Code / Artifact Scan Job 확인. Biz Cluster Scan을 remote Job으로 실행하도록 구성한 경우에만 Biz Cluster target namespace에서 `kubectl get job,cronjob,cm,sa,role,rolebinding` 확인 |
+| G1 | `ClusterTarget`/`SecurityAssessment`가 존재하고 backend `POST /api/v1/scan-runs` 또는 수동 `ScanRun` CR apply로 실행을 트리거하면 management controller가 Code / Artifact Scan은 Mgmt-local Job으로 실행하고, Biz Cluster Scan은 read-only inspection(옵션으로 허용된 remote scanner Job)으로 실행한다. | ScanRun trigger 후 Mgmt Cluster에서 `kubectl get clustertarget,securityassessment,scanrun`과 Mgmt-local Code / Artifact Scan Job 확인. Biz Cluster Scan을 remote Job으로 실행하도록 구성한 경우에만 Biz Cluster target namespace에서 `kubectl get job,cronjob,cm,sa,role,rolebinding` 확인 |
 | G2 | Feature toggle은 feature별 managed resource를 생성하거나 제거한다. | `spec.features[].enabled` patch 후 resource 생성/삭제 확인 |
 | G3 | allowlist 기반 scan resource config로 선택된 scan Job의 resource와 scheduling field를 변경할 수 있다. | `spec.scanResources` patch 후 생성된 workload spec과 거부된 금지 field 확인 |
 | G4 | Trivy와 security assessment data는 PostgreSQL query record와 evidence/export artifact로 정규화된다. | `raw_reports`, `findings`, scan health, evidence/export artifact 검토 |
@@ -36,7 +36,7 @@ G1~G19를 구현 관점에서 옮긴 것이며, AI advisor 관련 G20/G21은 REQ
 | G17 | Mgmt Cluster 단일 operator가 Feature-as-Plugin registry를 통해 검사 기능을 오케스트레이션한다. | Reconciler 변경 없이 feature enable/disable, priority ordering, status reporting 확인 |
 | G18 | Biz Cluster Scan 전 preflight가 누락된 bootstrap 항목을 식별하고, 정책상 허용된 항목만 설치한다. | namespace/RBAC/image pull/report upload/optional CRD check 결과와 bootstrap audit 확인 |
 | G19 | Artifact Store는 backend plugin으로 교체 가능하며 S3/MinIO에 고정되지 않는다. | Filesystem 또는 SeaweedFS/S3-compatible backend 설정 전환 후 report artifact 조회 확인 |
-| G20 | (선택) AI remediation advisor는 기본 OFF opt-in이며 advisory sidecar·provenance·redaction·`scan_health` degraded를 제공한다. AI 실패는 scan Fail이 아니다. | [AI_REMEDIATION.md](./AI_REMEDIATION.md) 검증 기준 |
+| G20 | (선택) AI remediation advisor는 기본 OFF opt-in이며 advisory sidecar·provenance·redaction·`scan_health=Warning` (reason=`ai_advisor_unavailable`)을 제공한다. AI 실패는 scan Fail이 아니다. | [AI_REMEDIATION.md](./AI_REMEDIATION.md) 검증 기준 |
 | G21 | (선택) AI ON/OFF 동일 scan에서 finding count·severity·final decision이 동일하다. | AI ON/OFF A/B 비교 |
 
 ### 구현 Stage Gate
@@ -676,12 +676,12 @@ Reconcile()
   │      │     emptyDir로 clone/fetch(path mount/Artifact Store fetch/image tar/registry digest)
   │      ├── Biz Cluster Scan: Mgmt controller read-only applied config inspection
   │      └── Biz Cluster Scan: 필요 시 허용된 remote scanner Job Remote SSA Apply
-  ├── 14. Feature.Collect() → raw artifact reference 수집
+  ├── 14. Feature.Collect() → raw report/artifact reference 수집
   ├── 15. Feature.Normalize() → finding/scan health 생성
-  ├── 16. PostgreSQL에 raw_reports/findings/scan_health/final decision 저장 후 Artifact Store에 evidence/export 산출물 저장
-  ├── 17. label 기반 비활성 Feature/ScanRun remote GC
-  ├── 18. Code 결과와 Biz Cluster 결과 상관 분석
-  ├── 19. Evidence Bundle과 Exception Review 후보 생성
+  ├── 16. Code 결과와 Biz Cluster 결과 상관 분석 + final decision 확정
+  ├── 17. Evidence Bundle과 Exception Review 후보 생성
+  ├── 18. PostgreSQL에 raw_reports/findings/scan_health/final decision 저장 후 Artifact Store에 evidence/export 산출물 저장
+  ├── 19. label 기반 비활성 Feature/ScanRun remote GC
   └── 20. ClusterTarget.status와 ScanRun.status 갱신
 ```
 
@@ -820,7 +820,7 @@ kube-sentinel/
 | **M6** | Optional Inventory/Telemetry Extension | 선택 | OSQuery, OTel/LGTM, runtime telemetry는 별도 설계 승인 후 진행 |
 | **M7** | Final Check Dashboard | 2~3일 | Overview, Targets, Assessments, Findings, Reports, Governance 메뉴 조회 |
 | **M8** | Final-check validation | 1일 | 최종 보고서, Secret redaction, exception status, evidence bundle, no-auto-remediation guardrail 확인 |
-| **M9** | AI remediation advisor (선택) | 선택 | 기본 OFF opt-in. ON 시 advisory sidecar·provenance·redaction·`scan_health` degraded 생성, AI ON/OFF 판정 동일. 상세는 [AI_REMEDIATION.md](./AI_REMEDIATION.md) |
+| **M9** | AI remediation advisor (선택) | 선택 | 기본 OFF opt-in. ON 시 advisory sidecar·provenance·redaction·`scan_health=Warning` (reason=`ai_advisor_unavailable`) 생성, AI ON/OFF 판정 동일. 상세는 [AI_REMEDIATION.md](./AI_REMEDIATION.md) |
 
 **총 예상 기간: 3주+ (16 working days, parser/권한 이슈 발생 시 4주 버퍼)**
 
@@ -902,7 +902,7 @@ Scan은 `ClusterTarget`이 `Ready`가 아니면 실행하지 않고 `clusterScan
 | 3 | 컨테이너 이미지 취약점 및 Critical 취약점 존재 여부 | Trivy, Grype | Critical CVE 존재 또는 fixable High 과다 |
 | 4 | 이미지 digest 및 무결성 불일치 여부 | Syft, Cosign/Notation, Crane | 승인 digest 불일치, 서명 검증 실패, SBOM 누락 |
 | 5 | `privileged`, `hostPath` 등 고위험 Kubernetes 설정 여부 | kube-linter, conftest, Biz Cluster applied YAML inspection | 고위험 policy 위반 |
-| 6 | RBAC 과권한 및 불필요한 권한 부여 여부 | conftest, rbac-police, Biz Cluster applied RBAC inspection | wildcard, cluster-admin, 민감 리소스 과권한 |
+| 6 | RBAC 과권한 및 불필요한 권한 부여 여부 | conftest, Biz Cluster applied RBAC inspection, optional rbac-police input | wildcard, cluster-admin, 민감 리소스 과권한 |
 | 7 | Dockerfile 및 배포 스크립트 내 보안 위험 요소 | Hadolint, ShellCheck | High 이상 rule 또는 shellcheck error 존재 |
 | 8 | 스캔 실패, 분석 불가, 필수 산출물 누락 여부 | security-assessment orchestrator | 필수 report 누락 또는 scanner error |
 | 9 | 개선 권고 및 예외 검토 필요 항목 | exception review | 미승인/만료 예외, 개선 권고 누락 |
@@ -925,7 +925,7 @@ Biz Cluster 접근은 현재 버전에 포함하되, 실시간 런타임 탐지 
 
 상단 공통 필터:
 
-- Environment: `dev`, `final-check`
+- Environment: `dev`, `final-check`, `prod` (정본 enum은 [DATABASE.md](./DATABASE.md) `cluster_targets.environment`의 `dev|final-check|prod`. PoC에서는 `prod` target이 없으면 결과 0건)
 - Target version/build
 - Scan run ID
 - Namespace

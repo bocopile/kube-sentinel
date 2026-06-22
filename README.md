@@ -80,9 +80,10 @@ Biz Cluster에는 kube-sentinel operator를 실행하지 않으며 kube-sentinel
 
 ## 다음 구현 단계
 
-첫 구현 PR은 `operator/` Kubebuilder skeleton과 핵심 API 계약을 생성해야 합니다.
-현재 root `go.mod`는 pre-skeleton placeholder이므로, 첫 PR에서 `operator/go.mod`를
-생성한 뒤 root `go.mod`를 제거합니다.
+첫 구현 PR/블록 범위의 단일 정본은 [docs/ROADMAP.md](docs/ROADMAP.md) `첫 구현 블록`입니다.
+요약하면 첫 PR은 `operator/` Kubebuilder skeleton과 핵심 API 계약만 생성하고
+(`backend/`/`frontend/`는 후속 milestone), 임시 root `go.mod` placeholder를 `operator/go.mod`로
+대체한 뒤 root `go.mod`를 제거합니다. 상세 산출물 목록(`.orchestrator/config.yaml` 포함)은 ROADMAP을 따릅니다.
 
 - operator 모듈을 `github.com/bocopile/kube-sentinel/operator`로 초기화
 - `ClusterTarget`, `SecurityAssessment`, `ScanRun` API 생성

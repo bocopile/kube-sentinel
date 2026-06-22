@@ -9,7 +9,7 @@ project를 대상으로 하며, kube-sentinel은 Go Kubernetes operator다.
 이 리포지터리는 pre-skeleton Go 상태다. 임시 root `go.mod`(첫 PR에서 `operator/go.mod`로
 대체·제거 예정)와 계획 문서는 존재하지만 3-모듈 정본의 `operator/go.mod`와 Kubebuilder가
 생성한 `operator/cmd/`, `operator/api/`, `operator/internal/`, `operator/config/`,
-`operator/PROJECT`, `.orchestrator/config.yaml` 파일은 아직 없다.
+`operator/PROJECT`, `.orchestrator/config.yaml` 파일은 아직 없다. 첫 구현 블록의 정확한 생성 범위는 [ROADMAP.md](./ROADMAP.md) §첫 구현 블록을 단일 정본으로 따른다.
 
 따라서 유효한 실행 방식은 두 가지다.
 

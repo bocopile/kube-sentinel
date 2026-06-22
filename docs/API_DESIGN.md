@@ -69,7 +69,7 @@ list 엔드포인트는 offset/limit 기반 페이지네이션을 사용한다.
 | GET | `/api/v1/scan-runs/{id}/findings/{findingId}/raw-report` | raw scanner 출력 |
 | GET | `/api/v1/scan-runs/{id}/health` | scan health 기록 |
 | GET | `/api/v1/scan-runs/{id}/artifacts` | artifact 목록 |
-| GET | `/api/v1/scan-runs/{id}/artifacts/{artifactType}/download` | artifact 다운로드 URL |
+| GET | `/api/v1/scan-runs/{id}/artifacts/{artifactId}/download` | artifact 다운로드 URL |
 | GET | `/api/v1/exceptions` | 예외 검토 목록 |
 | PATCH | `/api/v1/exceptions/{id}` | 예외 상태 전환 |
 | GET | `/api/v1/governance/summary` | 거버넌스 요약 |
@@ -139,7 +139,7 @@ dashboard Overview 화면용 집계 데이터.
       "display_name": "Biz Cluster A",
       "environment": "final-check",
       "phase": "Ready",
-      "kubernetes_version": "1.31.0",
+      "kubernetes_version": "1.35.0",
       "capabilities": {
         "scannerJobs": true,
         "readOnlyInspection": true,
@@ -218,7 +218,7 @@ dashboard Overview 화면용 집계 데이터.
 
 ### POST /api/v1/scan-runs
 
-ScanRun CR을 생성해 scan을 트리거한다. 내부적으로 k8s API에 ScanRun CR를 apply하고
+ScanRun CR을 생성해 scan을 트리거한다. backend는 Mgmt k8s API에 ScanRun CR만 apply하고(PostgreSQL `scan_runs` 초기 row는 operator reconciler가 upsert)
 결과 id를 반환한다.
 
 **요청 body:**
@@ -309,7 +309,7 @@ scope 동작:
 
 ### GET /api/v1/scan-runs/{id}/status
 
-phase 폴링용 경량 엔드포인트. frontend는 5초마다 호출한다.
+phase 폴링용 경량 엔드포인트. frontend는 5초마다 호출한다. `scan_runs` row의 정본 write 주체는 operator reconciler이므로, `POST /api/v1/scan-runs`로 CR을 apply한 직후 reconcile이 초기 row를 만들기 전까지는 `404 NOT_FOUND`를 반환할 수 있고 frontend는 이 초기 404를 일시적 상태로 처리하고 폴링을 계속한다.
 
 **응답 `200`:**
 
@@ -484,7 +484,7 @@ Artifact Store에 저장된 파일 목록.
     {
       "id": 1,
       "artifact_type": "evidence_bundle",
-      "path": "scanrun-abc123/reports/evidence-bundle.tar.gz",
+      "path": "reports/final-check-20260618/scanrun-abc123/evidence/evidence-bundle.tar.gz",
       "checksum": "sha256:deadbeef...",
       "schema_version": "security.finding/v1",
       "scanner": null,
@@ -496,7 +496,7 @@ Artifact Store에 저장된 파일 목록.
     {
       "id": 2,
       "artifact_type": "sbom",
-      "path": "scanrun-abc123/sbom/registry.example.com_app_sha256_abc.spdx.json",
+      "path": "reports/final-check-20260618/scanrun-abc123/sbom/sha256-abc123.cyclonedx.json",
       "checksum": "sha256:cafebabe...",
       "schema_version": "SPDX-2.3",
       "scanner": "syft",
@@ -512,29 +512,33 @@ Artifact Store에 저장된 파일 목록.
 
 ---
 
-### GET /api/v1/scan-runs/{id}/artifacts/{artifactType}/download
+### GET /api/v1/scan-runs/{id}/artifacts/{artifactId}/download
 
-Artifact Store 파일의 presigned download URL을 반환한다.
+`artifact_index.id`로 식별되는 단일 Artifact Store 파일의 presigned download URL을 반환한다.
+`artifactId`는 `GET /api/v1/scan-runs/{id}/artifacts` 응답의 `items[].id`를 사용한다. 같은
+`artifact_type`(digest별 SBOM, verificationType별 integrity report 등)에 파일이 여러 개여도
+이 값으로 단일 파일을 선택한다. `artifact_type`은 list/filter 용도이며 download 식별자로
+쓰지 않는다. path convention은 [ARCHITECTURE.md](./ARCHITECTURE.md) §Artifact path convention을 따른다.
 Filesystem store의 경우 backend가 stream proxy로 동작한다.
 
 **경로 파라미터:**
 
 | 파라미터 | 설명 |
 |----------|------|
-| `artifactType` | `evidence_bundle`, `sbom`, `human_report`, `exception_review_yaml`, `remediation_advisory` |
+| `artifactId` | `GET /api/v1/scan-runs/{id}/artifacts` 응답의 `id` (동일 `artifact_type` 다중 파일 구분용) |
 
 **응답 `200`:**
 
 ```json
 {
-  "url": "https://storage.example.com/bucket/scanrun-abc123/reports/evidence-bundle.tar.gz?sig=...",
+  "url": "https://storage.example.com/bucket/reports/final-check-20260618/scanrun-abc123/evidence/evidence-bundle.tar.gz?sig=...",
   "expires_at": "2026-06-18T13:00:00Z"
 }
 ```
 
 Filesystem store: `url`이 backend proxy 경로 (`/api/v1/artifacts/proxy/...`).
 
-**응답 `404`:** 해당 artifact_type 없음.
+**응답 `404`:** 해당 `artifactId` artifact 없음.
 
 ---
 
@@ -598,6 +602,10 @@ Filesystem store: `url`이 backend proxy 경로 (`/api/v1/artifacts/proxy/...`).
 | `Requested` | `Approved` | 예외 승인 |
 | `Requested` | `Rejected` | 예외 거부 |
 | `Approved` | `Expired` | 만료 (자동 또는 수동) |
+| `Rejected` | `Required` | 재스캔에서 동일 finding 재보고 시 재평가(재신청 가능) |
+| `Expired` | `Required` | 재스캔/만료 후 동일 finding 재보고 시 재평가(재신청 가능) |
+
+`Rejected`/`Expired` → `Required` 전환은 재스캔 carry-over 재평가([DATABASE.md](./DATABASE.md) §exception_reviews 재스캔 carry-over 규칙)에 따라 operator가 새 ScanRun row를 만들 때 수행하며 사용자 PATCH로도 허용한다. 그 외 전환은 `409 CONFLICT`.
 
 **요청 body:**
 
@@ -673,6 +681,8 @@ None
 Required → Requested → Approved → Expired
                      → Rejected
 ```
+
+재스캔으로 동일 `finding_id`가 새 ScanRun에 등장하면, 유효한 `Approved`(미만료)는 새 row로 carry-over하고 `Expired`/`Rejected`는 `Required`로 재평가한다(상세는 DATABASE.md §exception_reviews 재스캔 carry-over 규칙).
 
 ### scan profiles enum
 

@@ -29,18 +29,18 @@ test 가능한 상태여야 한다.
 | M6 | Optional telemetry/inventory extension | 선택 | Phase 2 전용. OTel/LGTM/OSQuery/runtime telemetry는 별도 설계 검토 후 도입 |
 | M7 | Final-check dashboard | 2-3일 | Overview, Targets, Assessments, Findings, Reports, Governance 메뉴 캡처 |
 | M8 | Final-check validation | 1일 | delivery artifact scan, applied cluster configuration scan, report generation, Secret redaction, exception status, evidence bundle, no-auto-remediation guardrail end-to-end 검증 |
-| M9 | AI remediation advisor (선택) | 선택 | 기본 OFF opt-in. ON 시 redaction·advisory sidecar·provenance·`scan_health` degraded 생성, AI ON/OFF 판정 동일. 상세는 [AI_REMEDIATION.md](./AI_REMEDIATION.md) |
+| M9 | AI remediation advisor (선택) | 선택 | 기본 OFF opt-in. ON 시 redaction·advisory sidecar·provenance·`scan_health=Warning` (reason=`ai_advisor_unavailable`) 생성, AI ON/OFF 판정 동일. 상세는 [AI_REMEDIATION.md](./AI_REMEDIATION.md) |
 
 ## 첫 구현 블록
 
-첫 코드 블록은 모든 sensor를 한 번에 구현하지 않는다. 다음 항목을 생성한다.
+이 절이 첫 구현 PR/블록(P0) 범위의 단일 정본이다(README "다음 구현 단계", ORCHESTRATOR/PROMPTS P0는 이 절을 참조한다). 첫 코드 블록은 모든 sensor를 한 번에 구현하지 않으며, 모노레포 3-모듈 중 `operator/` skeleton만 초기화한다. 다음 항목을 생성한다.
 
-- Go module과 controller-runtime project skeleton
-- `ClusterTarget`, `SecurityAssessment`, `ScanRun` API type
+- `operator/` Go module(`github.com/bocopile/kube-sentinel/operator`)과 controller-runtime project skeleton. 임시 root `go.mod` placeholder는 이 블록에서 `operator/go.mod`로 대체하고 root `go.mod`는 제거한다.
+- `ClusterTarget`, `SecurityAssessment`, `ScanRun` API type (cluster-scoped)
 - status patching이 포함된 빈 reconciler
 - feature registry interface와 Feature orchestrator skeleton
 - Artifact Store backend plugin interface
-- registry ordering과 unknown feature validation unit test
+- registry ordering, `profiles[]`/`features[]` merge, unknown profile/unknown feature validation unit test
 - `orchestrator init`으로 생성한 `.orchestrator/config.yaml`
 
-이후 S0과 S1을 진행한다.
+`backend/`/`frontend/` 모듈 디렉터리는 첫 블록 범위가 아니며 각각 후속 milestone에서 초기화한다. 이후 S0과 S1을 진행한다.

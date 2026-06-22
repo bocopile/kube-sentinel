@@ -101,7 +101,7 @@ docs/PLAN.md, docs/REQUIREMENTS.md, docs/ARCHITECTURE.md,
 docs/ROADMAP.md, docs/MODULES.md를 project contract로 사용한다.
 
 이 프로젝트는 operator/, backend/, frontend/ 3개 모듈로 구성된 모노레포다.
-P0에서는 operator/ 모듈 skeleton만 생성한다.
+P0 산출물 범위는 docs/ROADMAP.md §첫 구현 블록을 단일 정본으로 따른다. P0에서는 operator/ 모듈 skeleton과 `.orchestrator/config.yaml`만 생성하고 backend/frontend는 초기화하지 않는다.
 
 operator/ 초기화 (operator/ 디렉터리 안에서):
 - Go module: github.com/bocopile/kube-sentinel/operator
@@ -431,7 +431,7 @@ backend/ 범위:
   GET  /api/v1/scan-runs/{id}/findings/{findingId}/raw-report
   GET  /api/v1/scan-runs/{id}/health
   GET  /api/v1/scan-runs/{id}/artifacts
-  GET  /api/v1/scan-runs/{id}/artifacts/{artifactType}/download
+  GET  /api/v1/scan-runs/{id}/artifacts/{artifactId}/download
   GET  /api/v1/exceptions, PATCH /api/v1/exceptions/{id}
   GET  /api/v1/governance/summary
 - PostgreSQL query 구현 (pgx/v5): docs/DATABASE.md 인덱스 활용.
@@ -522,7 +522,7 @@ docs/AI_REMEDIATION.md와 docs/ROADMAP.md의 M9를 구현한다. 1차 선택 기
 - artifact_index에 artifact_type='remediation_advisory' 기록.
   remediation-advisory sidecar와 provenance. core findings 테이블 불변.
 - scan_health reason: ai_advisor_unavailable | ai_output_rejected.
-- API/timeout/validation 실패 시 scan non-Fail, scan_health degraded.
+- API/timeout/validation 실패 시 scan non-Fail, `scan_health=Warning` (reason=ai_advisor_unavailable).
 
 automatic remediation, severity/판정 변경, secret/sast/script 입력, Vertex AI,
 core remediation 덮어쓰기는 구현하지 않는다.
@@ -533,7 +533,7 @@ core remediation 덮어쓰기는 구현하지 않는다.
 - cd operator && go build ./... 통과.
 - Secret fixture 입력 시 Gemini request body에 원문 미포함.
 - AI ON/OFF 동일 scan에서 finding count, severity, final decision 동일.
-- Gemini 실패 fixture에서 scan Completed + scan_health degraded.
+- Gemini 실패 fixture에서 scan Completed + `scan_health=Warning` (reason=ai_advisor_unavailable).
 - evidence bundle에 sidecar와 provenance 포함.
 ```
 

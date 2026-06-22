@@ -96,23 +96,23 @@
 ## 3. MEDIUM — 정합성·완결성
 
 - **[I-11]** README 문서 목록·PLAN docs 트리에 DATABASE/API_DESIGN(및 MODULES) 누락 — C5+X13+U11 만장일치. (협의: PLAN 트리엔 MODULES는 이미 있음 → DATABASE/API_DESIGN만 추가.)
-- **[I-12]** reconcile 순서 역전: evidence bundle/final-decision을 **생성(step 18~19) 전에 저장(step 15)** — X4 만장일치. ARCHITECTURE+PLAN+AI_REMEDIATION 흐름을 `Normalize → Final Decision → (remediation enrich) → report export/evidence 생성 → metadata 확정` 순으로 재정렬.
-- **[I-13]** `scan_runs` 초기 row·`cluster_targets` 미러 write 주체 모호 — C10+U15 만장일치. operator가 reconcile 시 upsert(정본), backend POST는 CR apply만, status polling의 row-부재 404 처리 명시.
-- **[I-14]** artifact download API가 `{artifactType}`만 받아 다중 SBOM/integrity 구분 불가(X10) + Artifact Store path 규칙 불일치(U14: `scanrun-abc123/reports/…` vs `reports/<assessment>/<run>/evidence/…`, `.spdx` vs `.cyclonedx`) — 만장일치. download를 artifact id/path 기반으로, path convention 단일화.
-- **[I-15]** AI advisor 확장 모델 정책 불명확 — C9(typed `aiRemediation` vs `FeatureSpec.Config` RawExtension "CRD 변경 없음" 원칙 충돌, refined) + X9("scan_health degraded"는 enum 값이 아니라 `Warning`+`reason=ai_advisor_unavailable` 서술 → 용어 통일, refined). 확장 모델 정책과 용어를 문서로 명문화.
-- **[I-16]** Environment enum 불일치 — C12 만장일치. SECURITY_ASSESSMENT/FRONTEND는 `dev`,`final-check`만, PLAN/DB/API는 `prod` 포함. DATABASE 기준 `dev|final-check|prod`로 고정(필요 시 "PoC 미사용" 명시).
-- **[I-17]** Kyverno/Gatekeeper/rbac-police가 baseline/feature/milestone에 없음 — U10(refined; SonarQube는 이미 optional 계약 있어 제외). 3개 도구를 필수/optional/비목표로 분류.
-- **[I-18]** remote scanner Job → Report Store upload 경로 미정의 — X12 만장일치. (I-1 저장 정본 해소와 함께 다룰 것: upload token/Secret/egress vs controller pull.)
-- **[I-19]** G1 검증 기준이 ScanRun 생성 주체/순서를 모호하게 둠 — U13(refined). G1 절차에 ScanRun 생성 주체(사용자 vs controller 자동) 명시.
+- ✅ **[I-12]** reconcile 순서 역전: evidence bundle/final-decision을 **생성(step 18~19) 전에 저장(step 15)** — X4 만장일치. ARCHITECTURE+PLAN+AI_REMEDIATION 흐름을 `Normalize → Final Decision → (remediation enrich) → report export/evidence 생성 → metadata 확정` 순으로 재정렬.
+- ✅ **[I-13]** `scan_runs` 초기 row·`cluster_targets` 미러 write 주체 모호 — C10+U15 만장일치. operator가 reconcile 시 upsert(정본), backend POST는 CR apply만, status polling의 row-부재 404 처리 명시.
+- ✅ **[I-14]** artifact download API가 `{artifactType}`만 받아 다중 SBOM/integrity 구분 불가(X10) + Artifact Store path 규칙 불일치(U14: `scanrun-abc123/reports/…` vs `reports/<assessment>/<run>/evidence/…`, `.spdx` vs `.cyclonedx`) — 만장일치. download를 artifact id/path 기반으로, path convention 단일화.
+- ✅ **[I-15]** AI advisor 확장 모델 정책 불명확 — C9(typed `aiRemediation` vs `FeatureSpec.Config` RawExtension "CRD 변경 없음" 원칙 충돌, refined) + X9("scan_health degraded"는 enum 값이 아니라 `Warning`+`reason=ai_advisor_unavailable` 서술 → 용어 통일, refined). 확장 모델 정책과 용어를 문서로 명문화.
+- ✅ **[I-16]** Environment enum 불일치 — C12 만장일치. SECURITY_ASSESSMENT/FRONTEND는 `dev`,`final-check`만, PLAN/DB/API는 `prod` 포함. DATABASE 기준 `dev|final-check|prod`로 고정(필요 시 "PoC 미사용" 명시).
+- ✅ **[I-17]** Kyverno/Gatekeeper/rbac-police가 baseline/feature/milestone에 없음 — U10(refined; SonarQube는 이미 optional 계약 있어 제외). 3개 도구를 필수/optional/비목표로 분류.
+- ✅ **[I-18]** remote scanner Job → Report Store upload 경로 미정의 — X12 만장일치. (I-1 저장 정본 해소와 함께 다룰 것: upload token/Secret/egress vs controller pull.)
+- ✅ **[I-19]** G1 검증 기준이 ScanRun 생성 주체/순서를 모호하게 둠 — U13(refined). G1 절차에 ScanRun 생성 주체(사용자 vs controller 자동) 명시.
 - **[I-23]** MODULES.md "모듈 간 경계" 토폴로지 다이어그램이 `frontend (React SPA)`를 **Mgmt Cluster 박스 밖**에 배치(Biz Cluster scanner Jobs와 같은 높이) — ARCHITECTURE.md 정본(line 14·25 "Dashboard/API … in Mgmt", mermaid line 53~65에서 `dashboard`/`assessment_api`/`metadata_store`/`artifact_store` 모두 `subgraph mgmt` 내부)과 모순. *(3-AI 자동 검토가 놓치고 사용자 후속 검토에서 발견 → 이 브랜치에서 다이어그램 수정 완료: operator·PostgreSQL·Artifact Store·backend·frontend 전부 Mgmt Cluster 박스 안에 배치, Biz Cluster는 scanner Job/RBAC/namespace만 별도 박스로 분리.)*
 
 ---
 
 ## 4. LOW / NIT
 
-- **[I-20]** API cluster-targets 예시 `kubernetes_version: "1.31.0"`이 baseline `v1.34~v1.36` 밖 — C11 만장일치. 예시를 `1.35.0`으로.
-- **[I-21]** exception 상태머신 재스캔 carry-over 규칙 부재 — C13(refined). "유효 Approved 유지, Expired/Rejected는 Required로 재평가" 규칙 추가.
-- **[I-22]** 첫 구현 PR 범위(`.orchestrator/config.yaml` 포함 여부, 3모듈 동시 초기화 여부)가 README/ROADMAP/ORCHESTRATOR마다 상이 — C14 만장일치. ROADMAP "첫 구현 블록"을 단일 정본으로.
+- ✅ **[I-20]** API cluster-targets 예시 `kubernetes_version: "1.31.0"`이 baseline `v1.34~v1.36` 밖 — C11 만장일치. 예시를 `1.35.0`으로.
+- ✅ **[I-21]** exception 상태머신 재스캔 carry-over 규칙 부재 — C13(refined). "유효 Approved 유지, Expired/Rejected는 Required로 재평가" 규칙 추가.
+- ✅ **[I-22]** 첫 구현 PR 범위(`.orchestrator/config.yaml` 포함 여부, 3모듈 동시 초기화 여부)가 README/ROADMAP/ORCHESTRATOR마다 상이 — C14 만장일치. ROADMAP "첫 구현 블록"을 단일 정본으로.
 
 ---
 

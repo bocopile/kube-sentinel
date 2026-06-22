@@ -13,7 +13,7 @@ Cluster를 등록하고, 납품 산출물 보안 평가를 실행하며, remote 
 
 | ID | 요구사항 | 검증 방법 |
 | --- | --- | --- |
-| G1 | `ClusterTarget`와 `SecurityAssessment` CR을 생성하면 management controller가 Code / Artifact Scan은 Mgmt-local Job으로 실행하고, Biz Cluster Scan은 read-only inspection(옵션으로 허용된 remote scanner Job)으로 실행한다. | Mgmt Cluster에서 `kubectl get clustertarget,securityassessment,scanrun`과 Mgmt-local Code / Artifact Scan Job 확인. Biz Cluster Scan을 remote Job으로 실행하도록 구성한 경우에만 Biz Cluster target namespace에서 `kubectl get job,cronjob,cm,sa,role,rolebinding` 확인 |
+| G1 | `ClusterTarget`/`SecurityAssessment`가 존재하고 backend `POST /api/v1/scan-runs` 또는 수동 `ScanRun` CR apply로 실행을 트리거하면 management controller가 Code / Artifact Scan은 Mgmt-local Job으로 실행하고, Biz Cluster Scan은 read-only inspection(옵션으로 허용된 remote scanner Job)으로 실행한다. | ScanRun trigger 후 Mgmt Cluster에서 `kubectl get clustertarget,securityassessment,scanrun`과 Mgmt-local Code / Artifact Scan Job 확인. Biz Cluster Scan을 remote Job으로 실행하도록 구성한 경우에만 Biz Cluster target namespace에서 `kubectl get job,cronjob,cm,sa,role,rolebinding` 확인 |
 | G2 | Feature toggle은 feature별 managed resource를 생성하거나 제거한다. | `spec.features[].enabled` patch 후 resource 생성/삭제 확인 |
 | G3 | allowlist 기반 scan resource config로 선택된 scan Job의 resource와 scheduling field를 변경할 수 있다. | `spec.scanResources` patch 후 생성된 workload spec과 거부된 금지 field 확인 |
 | G4 | Trivy와 security assessment data는 PostgreSQL query record와 evidence/export artifact로 정규화된다. | `raw_reports`, `findings`, scan health, evidence/export artifact 검토 |
@@ -32,7 +32,7 @@ Cluster를 등록하고, 납품 산출물 보안 평가를 실행하며, remote 
 | G17 | Mgmt Cluster 단일 operator가 Feature-as-Plugin registry를 통해 검사 기능을 오케스트레이션한다. | Reconciler 변경 없이 feature enable/disable, priority ordering, status reporting 확인 |
 | G18 | Biz Cluster Scan 전 preflight가 누락된 bootstrap 항목을 식별하고, 정책상 허용된 항목만 설치한다. | namespace/RBAC/image pull/report upload/optional CRD check 결과와 bootstrap audit 확인 |
 | G19 | Artifact Store는 backend plugin으로 교체 가능하며 S3/MinIO에 고정되지 않는다. | Filesystem 또는 SeaweedFS/S3-compatible backend 설정 전환 후 report artifact 조회 확인 |
-| G20 | AI remediation advisor는 기본 OFF opt-in이며, ON 시 advisory sidecar, provenance, redaction, `scan_health` degraded 기록을 제공한다. AI 실패는 scan Fail이 아니다. | AI ON/OFF scan에서 sidecar/provenance 생성, redaction fixture, Gemini 실패 시 scan Completed 확인 ([AI_REMEDIATION.md](./AI_REMEDIATION.md)) |
+| G20 | AI remediation advisor는 기본 OFF opt-in이며, ON 시 advisory sidecar, provenance, redaction, `scan_health=Warning` (reason=`ai_advisor_unavailable`) 기록을 제공한다. AI 실패는 scan Fail이 아니다. | AI ON/OFF scan에서 sidecar/provenance 생성, redaction fixture, Gemini 실패 시 scan Completed 확인 ([AI_REMEDIATION.md](./AI_REMEDIATION.md)) |
 | G21 | AI ON/OFF 동일 scan에서 finding count, severity, final decision이 동일하다(판정 비개입). | AI ON/OFF A/B 결과 비교 |
 
 G1~G19는 1차 필수 성공 기준이다. G20/G21은 AI remediation advisor opt-in 시에만

@@ -192,6 +192,8 @@ path, checksum, schema version, scanner baseline metadata는 동일하게 유지
 | Component | Baseline version | Requirement |
 | --- | --- | --- |
 | Trivy Operator | `v0.31.1` | Optional read-only `VulnerabilityReport` input only. kube-sentinel does not install or operate Trivy Operator in the first MVP. |
+| Kyverno/Gatekeeper policy bundles | organization-approved policy version | Optional policy-pack input for `kubernetes_manifest`. First MVP baseline은 kube-linter/conftest이며 kube-sentinel은 Kyverno/Gatekeeper controller를 설치·운영하지 않는다. |
+| rbac-police | organization-approved version | Optional CLI input for `rbac_review`. First MVP baseline은 conftest + read-only applied RBAC inspection이다. |
 | Artifact Store backend | deployment-specific | Filesystem, S3-compatible, MinIO, SeaweedFS, NFS/PVC 등에서 선택한다. 코드와 API는 backend plugin interface 뒤에 둔다. |
 
 ### Phase 2 only
@@ -578,14 +580,13 @@ umbrella 명칭·registry feature ID·profile 매핑 표 어디에도 없는 `fe
 12. Mgmt-local Job·Biz read-only inspection·옵션 remote scanner Job에서 raw report를 수집해 PostgreSQL `raw_reports`에 저장한다(Artifact Store에 raw 정본 경로를 만들지 않음 — §Runner placement and artifact input delivery).
 13. feature별 `Collect()`로 artifact reference를 수집한다.
 14. feature별 `Normalize()`로 normalized finding과 scan health를 생성한다.
-15. queryable ScanRun, raw scanner output(`raw_reports`), normalized finding(`findings`),
-    scan health, final decision, exception review row를 PostgreSQL Report Metadata Store에 upsert한다.
-16. SBOM, scanner baseline, artifact-input manifest, exported report, evidence bundle 같은
+15. Code / Artifact Scan과 Biz Cluster Scan 결과를 상관 분석하고 final decision을 확정한다.
+16. Evidence Bundle 내용과 Exception Review 후보를 생성한다. evidence bundle 생성 시 `findings`에 저장될 normalized finding set에서 `normalized/findings.jsonl` immutable snapshot을 준비한다.
+17. queryable ScanRun, raw scanner output(`raw_reports`), normalized finding(`findings`),
+    scan health, 확정된 final decision, exception review row를 PostgreSQL Report Metadata Store에 upsert한다.
+18. SBOM, scanner baseline, artifact-input manifest, exported report, evidence bundle 같은
     파생·증적 산출물을 Report Artifact Store에 기록하고 `artifact_index` row를 upsert한다.
-    evidence bundle 생성 시 `findings`에서 `normalized/findings.jsonl` immutable snapshot을 export한다.
-17. disabled/stale remote resource를 label 기반으로 GC한다.
-18. Code / Artifact Scan과 Biz Cluster Scan 결과를 상관 분석한다.
-19. Evidence Bundle과 Exception Review 후보를 생성한다.
+19. disabled/stale remote resource를 label 기반으로 GC한다.
 20. `ClusterTarget.status`와 `ScanRun.status`를 갱신한다.
 
 ## Runner placement and artifact input delivery
