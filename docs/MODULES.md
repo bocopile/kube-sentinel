@@ -260,27 +260,31 @@ npm run test
 ## 모듈 간 경계
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      Mgmt Cluster                           │
-│                                                             │
-│  ┌─────────────┐   writes   ┌──────────────────────────┐   │
-│  │  operator   │──────────▶│  PostgreSQL (metadata)   │   │
-│  │             │            │  Artifact Store (files)  │   │
-│  │  CRD types  │            └──────────┬───────────────┘   │
-│  │  reconciler │                       │ reads             │
-│  │  feature    │            ┌──────────▼───────────────┐   │
-│  │  normalizer │            │  backend (API server)    │   │
-│  └──────┬──────┘            │                          │   │
-│         │ remote apply      │  k8s dynamic client      │   │
-│         │                   │  REST /api/v1/           │   │
-└─────────┼───────────────────┴──────────┬───────────────┘   │
-          │                              │ HTTP               │
-          ▼                              ▼                    │
-     Biz Cluster                   ┌──────────┐              │
-     scanner Jobs                  │ frontend │              │
-                                   │ React SPA│              │
-                                   └──────────┘              │
+┌───────────────────────────────────────────────────────────────────┐
+│  Mgmt Cluster   (kube-sentinel solution is deployed here)         │
+│                                                                   │
+│   - operator        CRD, reconciler, feature orchestrator,        │
+│                     normalizer, remote apply, ArtifactStore write │
+│   - PostgreSQL      metadata: scan_run, finding, artifact_index   │
+│   - Artifact Store  raw report, normalized JSONL, SBOM, evidence  │
+│   - backend         REST API server, k8s dynamic client, PG read  │
+│   - frontend        React SPA, Final Check Dashboard              │
+│                                                                   │
+│   operator ── remote apply (target kubeconfig) ──┐                │
+└──────────────────────────────────────────────────┼────────────────┘
+                                                   ▼
+┌───────────────────────────────────────────────────────────────────┐
+│  Biz Cluster   (no kube-sentinel component is installed)          │
+│                                                                   │
+│   - kube-sentinel-system namespace, bootstrap RBAC                │
+│   - scanner Jobs / ConfigMap / ServiceAccount                     │
+│   - optional Trivy Operator VulnerabilityReport (read-only)       │
+└───────────────────────────────────────────────────────────────────┘
 ```
+
+operator · backend · frontend · PostgreSQL · Artifact Store 는 모두 Mgmt Cluster 에
+배포된다. Biz Cluster 에는 어떤 kube-sentinel 컴포넌트(operator/CRD/DB/backend/frontend)도
+설치하지 않으며, operator 의 remote apply 로 생성된 scanner Job·RBAC·namespace 만 존재한다.
 
 | 통신 방향 | 방식 | 비고 |
 |----------|------|------|

@@ -13,7 +13,7 @@
   - refined(핵심 인정, 범위/표현 수정): 13건
   - **기각(REJECTED)**: 1건 (C7 — 두 검증자 모두 refuted)
   - **강등(DOWNGRADED)**: 1건 (X2 — 실제 결함 아님, 용어 명확화로 축소)
-- **중복 병합** 후 고유 이슈 약 20개. 핵심은 "구현 착수를 막는 **저장 정본 충돌**과 **모듈 구조 충돌**, 그리고 **CRD 계약 누락 다발**".
+- **중복 병합** 후 고유 이슈 약 20개(+ 후속 사용자 검토로 추가된 I-23 1건). 핵심은 "구현 착수를 막는 **저장 정본 충돌**과 **모듈 구조 충돌**, 그리고 **CRD 계약 누락 다발**".
 
 ---
 
@@ -95,6 +95,7 @@
 - **[I-17]** Kyverno/Gatekeeper/rbac-police가 baseline/feature/milestone에 없음 — U10(refined; SonarQube는 이미 optional 계약 있어 제외). 3개 도구를 필수/optional/비목표로 분류.
 - **[I-18]** remote scanner Job → Report Store upload 경로 미정의 — X12 만장일치. (I-1 저장 정본 해소와 함께 다룰 것: upload token/Secret/egress vs controller pull.)
 - **[I-19]** G1 검증 기준이 ScanRun 생성 주체/순서를 모호하게 둠 — U13(refined). G1 절차에 ScanRun 생성 주체(사용자 vs controller 자동) 명시.
+- **[I-23]** MODULES.md "모듈 간 경계" 토폴로지 다이어그램이 `frontend (React SPA)`를 **Mgmt Cluster 박스 밖**에 배치(Biz Cluster scanner Jobs와 같은 높이) — ARCHITECTURE.md 정본(line 14·25 "Dashboard/API … in Mgmt", mermaid line 53~65에서 `dashboard`/`assessment_api`/`metadata_store`/`artifact_store` 모두 `subgraph mgmt` 내부)과 모순. *(3-AI 자동 검토가 놓치고 사용자 후속 검토에서 발견 → 이 브랜치에서 다이어그램 수정 완료: operator·PostgreSQL·Artifact Store·backend·frontend 전부 Mgmt Cluster 박스 안에 배치, Biz Cluster는 scanner Job/RBAC/namespace만 별도 박스로 분리.)*
 
 ---
 
