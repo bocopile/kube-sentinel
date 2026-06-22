@@ -595,100 +595,69 @@ metadata:
 
 ## 7. 프로젝트 디렉터리 구조
 
+모노레포 안에 3개의 독립 모듈로 구성한다. 상세 구조와 모듈 간 경계는
+[MODULES.md](./MODULES.md)를 참고한다.
+
 ```
 kube-sentinel/
-├── cmd/
-│   └── main.go                          # Feature import + healthz + metrics
 │
-├── api/v1alpha1/
-│   ├── clustertarget_types.go           # Biz Cluster 등록/접속/상태 CRD
-│   ├── securityassessment_types.go      # 검사 템플릿 CRD
-│   ├── scanrun_types.go                 # 검사 실행 CRD
-│   └── zz_generated.deepcopy.go
+├── operator/                            # Go module: github.com/bocopile/kube-sentinel/operator
+│   ├── go.mod
+│   ├── cmd/main.go                      # operator 진입점, Feature import
+│   ├── api/v1alpha1/                    # CRD types (ClusterTarget, SecurityAssessment, ScanRun)
+│   ├── internal/
+│   │   ├── controller/                  # ClusterTarget / SecurityAssessment / ScanRun reconciler
+│   │   ├── feature/                     # Feature interface, registry, plugin 구현체
+│   │   │   ├── target_preflight/        # Priority 10
+│   │   │   ├── bootstrap/               # Priority 20
+│   │   │   ├── source_security/         # Priority 50
+│   │   │   ├── secret_scan/             # Priority 50
+│   │   │   ├── image_vulnerability/     # Priority 100
+│   │   │   ├── image_integrity/         # Priority 100
+│   │   │   ├── sbom/                    # Priority 100
+│   │   │   ├── kubernetes_manifest/     # Priority 150
+│   │   │   ├── rbac_review/             # Priority 150
+│   │   │   ├── applied_cluster_config/  # Priority 200
+│   │   │   ├── secret_reference/        # Priority 200
+│   │   │   ├── trivy_operator_reports/  # Priority 200
+│   │   │   ├── remediation_enrichment/  # Priority 250 (선택, AI)
+│   │   │   └── report_export/           # Priority 300
+│   │   ├── target/                      # kubeconfig loader, remote apply, discovery, bootstrap
+│   │   ├── normalizer/                  # finding_id, schema_validator, secret_redaction
+│   │   ├── report/                      # store, evidence_bundle, exception_review
+│   │   └── artifactstore/               # ArtifactStore interface (write+read) + backend 구현
+│   └── config/                          # CRD manifest, Kustomize, sample CR
 │
-├── internal/
-│   ├── controller/
-│   │   ├── clustertarget_controller.go  # Biz Cluster 연결/capability/status 검증
-│   │   ├── securityassessment_controller.go # assessment template 검증
-│   │   └── scanrun_controller.go        # remote apply 실행 단위
-│   ├── target/
-│   │   ├── kubeconfig.go                # Mgmt Secret에서 kubeconfig client 생성
-│   │   ├── remote_apply.go              # Biz Cluster server-side apply
-│   │   ├── discovery.go                 # Biz Cluster discovery/RBAC/capability 검사
-│   │   └── bootstrap.go                 # 허용된 namespace/RBAC/scanner resource bootstrap
-│   └── feature/
-│       ├── feature.go                  # Feature 인터페이스
-│       ├── types.go                    # FeatureCondition, scan resource config
-│       ├── registry.go                 # 우선순위 기반 Registry
-│       ├── store.go                    # DesiredStateStore
-│       ├── target_preflight/feature.go # Priority 10
-│       ├── bootstrap/feature.go        # Priority 20
-│       ├── source_security/feature.go  # Priority 50
-│       ├── secret_scan/feature.go      # Priority 50
-│       ├── image_vulnerability/feature.go # Priority 100
-│       ├── image_integrity/feature.go  # Priority 100
-│       ├── sbom/feature.go             # Priority 100
-│       ├── kubernetes_manifest/feature.go # Priority 150
-│       ├── rbac_review/feature.go      # Priority 150
-│       ├── applied_cluster_config/feature.go # Priority 200
-│       ├── secret_reference/feature.go # Priority 200
-│       ├── trivy_operator_reports/feature.go # Priority 200
-│       ├── remediation_enrichment/feature.go # Priority 250 (선택, AI)
-│       └── report_export/feature.go    # Priority 300
-│   ├── normalizer/
-│   │   ├── finding_id.go               # stable finding ID / deduplication
-│   │   ├── schema_validator.go         # finding schema validation
-│   │   └── secret_redaction.go         # Secret raw value guard
-│   ├── report/
-│   │   ├── store.go                    # Report Store integration
-│   │   ├── evidence_bundle.go          # Evidence Bundle export
-│   │   └── exception_review.go         # Exception review artifact writer
-│   ├── artifactstore/
-│   │   ├── store.go                    # ArtifactStore interface
-│   │   ├── filesystem/
-│   │   ├── s3compatible/
-│   │   ├── seaweedfs/
-│   │   └── pvc/
+├── backend/                             # Go module: github.com/bocopile/kube-sentinel/backend
+│   ├── go.mod
+│   ├── cmd/main.go                      # API 서버 진입점
+│   └── internal/
+│       ├── handler/                     # REST handler (overview, findings, exceptions, ...)
+│       ├── db/                          # PostgreSQL query (scan_runs, findings, exceptions, ...)
+│       ├── k8s/                         # dynamic client, 경량 CR struct, ClusterTarget/ScanRun 조회
+│       ├── artifactstore/               # ArtifactReader interface (GetArtifact, GenerateDownloadURL)
+│       └── middleware/                  # CORS, logging
 │
-├── config/
-│   ├── crd/bases/
-│   └── samples/
-│       ├── clustertarget_dev.yaml
-│       ├── securityassessment_final_check.yaml
-│       └── scanrun_sample.yaml
-│
-├── security/
-│   ├── scanners/
-│   │   ├── semgrep.yaml
-│   │   ├── gitleaks.toml
-│   │   ├── trivy.yaml
-│   │   ├── kube-linter.yaml
-│   │   ├── conftest/
-│   │   ├── hadolint.yaml
-│   │   └── shellcheckrc
-│   ├── scripts/
-│   │   ├── run-security-assessment.sh
-│   │   ├── verify-image-digest.sh
-│   │   └── normalize-findings.sh
-│   ├── inputs/
-│   │   └── artifact-input.example.yaml
-│   └── reports/
-│       └── .gitkeep
+├── frontend/                            # npm: kube-sentinel-frontend
+│   ├── package.json
+│   └── src/
+│       ├── app/                         # Overview / Targets / Assessments / Findings / Reports / Governance
+│       ├── components/                  # filter-bar, finding-table, scan-status, exception-drawer
+│       ├── api/                         # REST client (overview, scan-runs, findings, exceptions, ...)
+│       └── types/                       # TypeScript 타입 (Finding, ScanRun, ClusterTarget, ...)
 │
 └── docs/
-    ├── PLAN.md                         # 이 문서 (상위 계획)
-    ├── REQUIREMENTS.md                 # 성공 기준 정본
-    ├── ARCHITECTURE.md                 # 아키텍처/CRD/RBAC/결과 저장
-    ├── SECURITY_ASSESSMENT.md          # 최종점검 실행 환경/대시보드/판정 정책
-    ├── ASSESSMENT_SUPPORT_FEATURES.md  # 1차 필수/선택/후순위 보조기능 범위
-    ├── FRONTEND_ARCHITECTURE.md        # Final Check Dashboard 화면/데이터 모델
-    ├── ROADMAP.md                      # stage gate / milestone
-    ├── ORCHESTRATOR.md                 # orchestrator 사용 가이드
-    ├── PROMPTS.md                      # milestone 구현 prompt
-    ├── AI_REMEDIATION.md               # AI 조치 가이드 advisor (선택)
-    ├── security-assessment-results.md   # 최종점검 결과 (실행 시 생성)
-    ├── exception-review.md              # 예외 검토 및 승인 이력 (실행 시 생성)
-    └── ctem-mapping-results.md         # 검증 결과 (M7 이후 생성)
+    ├── PLAN.md                          # 이 문서 (상위 계획)
+    ├── REQUIREMENTS.md                  # 성공 기준 정본
+    ├── ARCHITECTURE.md                  # 아키텍처/CRD/RBAC/결과 저장
+    ├── MODULES.md                       # 3-모듈 구조, 경계, 빌드 방법
+    ├── SECURITY_ASSESSMENT.md           # 최종점검 실행 환경/대시보드/판정 정책
+    ├── ASSESSMENT_SUPPORT_FEATURES.md   # 1차 필수/선택/후순위 보조기능 범위
+    ├── FRONTEND_ARCHITECTURE.md         # Final Check Dashboard 화면/데이터 모델
+    ├── ROADMAP.md                       # stage gate / milestone
+    ├── ORCHESTRATOR.md                  # orchestrator 사용 가이드
+    ├── PROMPTS.md                       # milestone 구현 prompt
+    └── AI_REMEDIATION.md                # AI 조치 가이드 advisor (선택)
 ```
 
 ---

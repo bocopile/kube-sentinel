@@ -41,15 +41,30 @@ operator workflow에 추가로 필요한 항목:
 
 ## 권장 순서
 
-리포지터리 root에서 실행한다.
+프로젝트는 모노레포 3-모듈 구조다. Kubebuilder는 `operator/` 안에서 초기화한다.
 
 ```bash
-kubebuilder init --domain kube-sentinel.io --repo github.com/bocopile/kube-sentinel
+# 1. operator 모듈 초기화 (최초 1회)
+cd operator/
+kubebuilder init --domain kube-sentinel.io --repo github.com/bocopile/kube-sentinel/operator
 kubebuilder create api --group security --version v1alpha1 --kind ClusterTarget --namespaced=false
 kubebuilder create api --group security --version v1alpha1 --kind SecurityAssessment --namespaced=false
 kubebuilder create api --group security --version v1alpha1 --kind ScanRun --namespaced=false
 go test ./...
 go build ./...
+cd ..
+
+# 2. backend 모듈 초기화 (최초 1회)
+cd backend/
+go mod init github.com/bocopile/kube-sentinel/backend
+cd ..
+
+# 3. frontend 모듈 초기화 (최초 1회)
+cd frontend/
+npm create next-app@latest . --typescript --tailwind --app
+cd ..
+
+# 4. orchestrator 초기화 (root에서)
 orchestrator init --project . --yes
 ```
 

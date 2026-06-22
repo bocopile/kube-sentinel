@@ -687,28 +687,72 @@ Required defaults:
 
 ### Result storage format
 
-The best storage model is hybrid:
+> 전체 테이블 DDL: [docs/DATABASE.md](./DATABASE.md)
 
-- Preserve raw scanner outputs as immutable artifacts.
-- Store normalized findings in a versioned JSONL format.
-- Store summaries and decisions as JSON documents.
-- Index query fields in PostgreSQL for dashboard/API retrieval.
-- Export human-readable reports separately from machine-readable records.
+저장 모델은 PostgreSQL과 Artifact Store를 역할별로 분리한다.
+
+- PostgreSQL: raw scanner 분석 결과, normalized finding, scan health, final decision,
+  exception review, artifact index. 모든 dashboard/API 쿼리는 PostgreSQL에서 수행한다.
+- Artifact Store: SBOM(CycloneDX), evidence bundle, human report, scanner baseline,
+  artifact-input.yaml. 대용량·표준 포맷·배포 증적 산출물을 보관한다.
+
+PostgreSQL에서 JSONB를 사용하는 이유:
+- `raw_reports.data JSONB` + GIN 인덱스로 scanner 출력 내부 필드를 직접 조회할 수 있다.
+- TOAST 자동 오프로드로 대형 JSONB가 row scan 속도를 저하시키지 않는다.
+- `TEXT[]` 네이티브 타입으로 `target_names`, `namespace_allowlist` 등 배열 필드를
+  별도 테이블 없이 저장할 수 있다.
+- MariaDB는 GIN 인덱스와 ARRAY 타입을 지원하지 않으므로 이 설계에서는 PostgreSQL만 사용한다.
 
 Recommended formats:
 
 | Data | Format | Storage | Reason |
 | --- | --- | --- | --- |
-| Raw scanner output | Original scanner format: JSON, SARIF, table text, or scanner-native output | Artifact Store | Keeps auditability and allows re-normalization after parser changes. |
-| Normalized findings | JSONL, one finding per line, validated by `security.finding/v1` JSON Schema | Artifact Store + Metadata Store index | Efficient append/export, diff-friendly, and easy to stream into DB/index. |
-| Finding index | PostgreSQL rows with indexed columns plus `details JSONB` | Metadata Store | Fast dashboard filters by scan run, severity, category, scanner, target, image digest, namespace, and exception status. |
-| Scan health | JSON document plus PostgreSQL row/index | Metadata Store + Artifact Store | Scanner failure and missing-artifact states must be queryable and exportable. |
-| Final decision | JSON document, schema `security.finalDecision/v1` | Metadata Store + Artifact Store | Reproducible Pass/Fail/Warning decision with linked evidence. |
-| SBOM | CycloneDX JSON by default; SPDX JSON accepted as input/export | Artifact Store | CycloneDX JSON is compact, common for scanner integration, and suitable for digest-linked storage. |
-| Image digest/signature report | JSON document, schema `security.imageIntegrity/v1` | Artifact Store + indexed digest fields | Keeps digest, signature policy, verification result, and key reference together. |
-| Exception review | YAML or JSON document, schema `security.exceptionReview/v1` | Metadata Store + Artifact Store | Human reviewable while still machine-validated. |
-| Evidence bundle | `tar.gz` or `zip` with `manifest.json`, raw reports, normalized findings, final decision, exception review, and checksums | Artifact Store | Portable delivery/inspection evidence. |
-| Human report | Markdown as source, optional PDF/HTML export | Artifact Store | Markdown is reviewable in Git and can generate PDF/HTML later. |
+| Raw scanner output | JSON 또는 SARIF → JSONB. 비구조화 text → TEXT | PostgreSQL `raw_reports` | GIN 인덱스로 scanner 출력 내부 쿼리 가능. 재정규화(parser 변경 후 재처리) 가능. |
+| Normalized findings | `security.finding/v1` JSON Schema, one row per finding | PostgreSQL `findings` | severity, category, scanner, namespace, exception_status 필터 및 집계. |
+| Finding index | PostgreSQL rows with indexed columns plus `details JSONB` | PostgreSQL `findings` | Fast dashboard filters. |
+| Scan health | PostgreSQL row + `details JSONB` | PostgreSQL `scan_health` | Scanner failure and missing-artifact states must be queryable. |
+| Final decision | `security.finalDecision/v1`, JSONB in `scan_runs.summary` | PostgreSQL `scan_runs` | Pass/Fail/Warning and counters queryable without join. |
+| Exception review | PostgreSQL rows + status machine | PostgreSQL `exception_reviews` | Queryable by status, expiry, owner. |
+| SBOM | CycloneDX JSON; SPDX JSON accepted | Artifact Store | 수 MB 표준 포맷 파일. digest 기준 경로로 저장. |
+| Image digest/signature report | `security.imageIntegrity/v1` JSON | Artifact Store + `artifact_index` row | digest, verification result, key reference. |
+| Evidence bundle | `tar.gz` with manifest, normalized findings export, final decision, exception review, checksums | Artifact Store | 배포/검수 증적 패키지. DB가 없어도 감사 가능. |
+| Human report | Markdown source, optional PDF/HTML | Artifact Store | 사람이 읽는 최종 보고서. |
+| Scanner baseline | JSON (scanner version, DB date, rule hash) | Artifact Store + `artifact_index` row | 재현성 보장. |
+| Artifact input manifest | YAML | Artifact Store | scan 입력 재현 선언. |
+
+### raw_reports 테이블 스키마
+
+```sql
+CREATE TABLE raw_reports (
+    id           BIGSERIAL    PRIMARY KEY,
+    scan_run_id  VARCHAR(255) NOT NULL REFERENCES scan_runs(id),
+    scanner      VARCHAR(100) NOT NULL,   -- trivy, semgrep, gitleaks, grype, kube-linter, ...
+    target_name  TEXT,                    -- image ref, file path, k8s resource name
+    format       VARCHAR(20)  NOT NULL,   -- json, sarif, text
+    data         JSONB,                   -- format=json or sarif
+    data_text    TEXT,                    -- format=text (비구조화 fallback)
+    created_at   TIMESTAMPTZ  NOT NULL
+);
+CREATE INDEX idx_raw_reports_scanrun  ON raw_reports(scan_run_id, scanner);
+CREATE INDEX idx_raw_reports_data_gin ON raw_reports USING GIN (data)
+    WHERE data IS NOT NULL;
+```
+
+scanner별 저장 포맷:
+
+| Scanner | 출력 포맷 | `format` 값 | 비고 |
+| --- | --- | --- | --- |
+| Trivy (CVE/config) | JSON | `json` | `--format json` |
+| Grype | JSON | `json` | `--output json` |
+| Semgrep | SARIF 또는 JSON | `sarif` / `json` | `--sarif` or `--json` |
+| gosec | SARIF 또는 JSON | `sarif` / `json` | `-fmt sarif` |
+| Gitleaks | JSON | `json` | `--report-format json` |
+| kube-linter | JSON | `json` | `--format json` |
+| conftest | JSON | `json` | `--output json` |
+| Hadolint | JSON 또는 SARIF | `json` / `sarif` | `--format json` |
+| ShellCheck | JSON 또는 SARIF | `json` / `sarif` | `--format json` |
+| Cosign/Notation | JSON | `json` | verification result |
+| Crane | JSON | `json` | digest metadata |
 
 Normalized finding JSONL is the canonical machine-readable finding artifact.
 Each line must contain at least:
@@ -729,39 +773,44 @@ Each line must contain at least:
   "remediation": "upgrade package or approve exception",
   "exception_required": true,
   "scan_status": "Fail",
-  "artifact_refs": ["raw/trivy/app-api.json"],
+  "raw_report_id": 42,
   "created_at": "2026-06-18T00:00:00Z"
 }
 ```
 
 Artifact path convention:
 
+raw scanner output은 PostgreSQL `raw_reports` 테이블에 저장하므로 `raw/` 경로는
+Artifact Store에 없다. Artifact Store에는 SBOM, evidence bundle, human report,
+scanner baseline, artifact input manifest만 보관한다.
+
 ```text
 reports/
   <assessment-name>/
     <scan-run-id>/
-      manifest.json
-      raw/<scanner>/<target>.json
-      normalized/findings.jsonl
-      normalized/scan-health.json
-      normalized/final-decision.json
-      sbom/<image-digest>.cyclonedx.json
-      integrity/<image-digest>.json
-      exceptions/exception-review.yaml
-      exports/final-report.md
-      evidence/evidence-bundle.tar.gz
-      normalized/remediation-advisory.jsonl   # AI advisor opt-in 시
-      normalized/remediation-provenance.json  # AI advisor opt-in 시
+      manifest.json                            # artifact index, checksums
+      sbom/<image-digest>.cyclonedx.json       # SBOM (Artifact Store 전용)
+      integrity/<image-digest>.json            # image digest/signature report
+      exceptions/exception-review.yaml         # human review artifact
+      exports/final-report.md                  # human report
+      evidence/evidence-bundle.tar.gz          # 배포/감사 증적 패키지
+      baseline/scanner-baseline.json           # scanner version, DB date
+      input/artifact-input.yaml                # scan 입력 재현 선언
+      normalized/remediation-advisory.jsonl    # AI advisor opt-in 시
+      normalized/remediation-provenance.json   # AI advisor opt-in 시
 ```
 
 Retrieval rule:
 
-- Dashboard/API reads list and filter views from PostgreSQL metadata.
-- Raw report, SBOM, evidence bundle, and exported report downloads use artifact
-  references from the metadata store.
-- Rebuilding the metadata index from artifacts must be possible. Therefore,
-  artifact records must include schema version, SHA256 checksum, scanner
-  version, scanner DB/rule baseline, target metadata, and generation time.
+- Dashboard/API reads all list, filter, detail views from PostgreSQL.
+  raw scanner output 재조회도 PostgreSQL `raw_reports` 테이블에서 수행한다.
+- SBOM, evidence bundle, exported report download는 `artifact_index`의 path를
+  참조해 Artifact Store에서 가져온다.
+- `artifact_index`는 Artifact Store 파일의 path, checksum, scanner version,
+  DB baseline date를 기록한다. PostgreSQL이 유실되어도 Artifact Store의
+  `manifest.json`과 SBOM에서 artifact_index를 재생성할 수 있어야 한다.
+- `raw_reports.data JSONB`는 재정규화(parser 변경 후 finding 재처리)의 입력으로
+  사용할 수 있다. 따라서 scanner 원본 출력을 손상 없이 저장해야 한다.
 
 ## Mgmt controller RBAC
 

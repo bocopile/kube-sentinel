@@ -1,0 +1,324 @@
+# Database Schema
+
+kube-sentinel은 PostgreSQL 18.x를 메타데이터 저장소로 사용한다. 모든 dashboard/API
+쿼리는 이 DB에서 수행한다. raw scanner output도 `raw_reports` 테이블의 JSONB 컬럼에
+저장한다. SBOM, evidence bundle, human report, scanner baseline은 Artifact Store(파일)
+에 저장하고 `artifact_index` 테이블로 참조한다.
+
+PostgreSQL을 선택한 이유:
+
+- `JSONB + GIN 인덱스`: raw scanner output 내부 필드를 인덱스로 조회 가능
+- `TOAST 자동 오프로드`: 대형 JSONB가 row scan 속도에 영향을 주지 않음
+- `TEXT[] 네이티브 배열`: `target_names`, `namespace_allowlist` 별도 테이블 불필요
+- `LISTEN/NOTIFY`: 추후 scan 상태 push 확장 경로
+- MariaDB는 GIN 인덱스와 ARRAY 타입이 없어 이 설계에 부적합
+
+---
+
+## 테이블 목록
+
+| 테이블 | 역할 |
+|--------|------|
+| `scan_runs` | ScanRun 실행 단위, phase, summary 집계 |
+| `raw_reports` | raw scanner 출력 (JSONB / TEXT) |
+| `findings` | normalized finding (stable ID, 필터 인덱스) |
+| `scan_health` | scanner 실패, unsupported target, stale baseline 기록 |
+| `exception_reviews` | finding 예외 승인 이력과 status machine |
+| `artifact_index` | Artifact Store 파일 참조 (SBOM, evidence bundle 등) |
+| `cluster_targets` | ClusterTarget CR k8s 미러 (status 캐시) |
+
+---
+
+## 테이블 상세 명세
+
+### scan_runs
+
+ScanRun 하나의 실행 단위. `summary` JSONB에 집계 카운터를 선계산해 Overview API
+응답을 빠르게 한다.
+
+```sql
+CREATE TABLE scan_runs (
+    id                   VARCHAR(255) PRIMARY KEY,
+    assessment_name      VARCHAR(255) NOT NULL,
+    target_names         TEXT[]       NOT NULL,         -- 검사 대상 ClusterTarget 이름 목록
+    phase                VARCHAR(50)  NOT NULL,          -- Pending | Running | Completed | Failed | Canceled
+    artifact_scan_phase  VARCHAR(50),                   -- Pending | Running | Completed | Failed | Skipped
+    cluster_scan_phase   VARCHAR(50),                   -- Pending | Running | Completed | Failed | Skipped
+    final_decision       VARCHAR(50),                   -- Pass | Fail | Warning
+    summary              JSONB        NOT NULL DEFAULT '{}',
+    -- {
+    --   "critical_count": 0,
+    --   "high_count": 0,
+    --   "exception_required_count": 0,
+    --   "scan_health_fail_count": 0,
+    --   "scanner_baseline_date": "2026-06-18"
+    -- }
+    created_at           TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    started_at           TIMESTAMPTZ,
+    finished_at          TIMESTAMPTZ
+);
+
+CREATE INDEX idx_scan_runs_phase       ON scan_runs(phase);
+CREATE INDEX idx_scan_runs_decision    ON scan_runs(final_decision);
+CREATE INDEX idx_scan_runs_created_at  ON scan_runs(created_at DESC);
+CREATE INDEX idx_scan_runs_assessment  ON scan_runs(assessment_name);
+```
+
+---
+
+### raw_reports
+
+scanner가 생성한 원본 출력. JSON/SARIF는 `data JSONB`에, 비구조화 텍스트는
+`data_text TEXT`에 저장한다. GIN 인덱스로 JSONB 내부 필드를 직접 조회할 수 있다.
+
+```sql
+CREATE TABLE raw_reports (
+    id           BIGSERIAL    PRIMARY KEY,
+    scan_run_id  VARCHAR(255) NOT NULL REFERENCES scan_runs(id) ON DELETE CASCADE,
+    scanner      VARCHAR(100) NOT NULL,
+    -- trivy | grype | semgrep | gosec | gitleaks | kube-linter | conftest
+    -- hadolint | shellcheck | cosign | notation | crane | syft
+    target_name  TEXT,
+    -- image ref (registry.example.com/app:sha256:...), file path, k8s resource name
+    format       VARCHAR(20)  NOT NULL CHECK (format IN ('json', 'sarif', 'text')),
+    data         JSONB,                     -- format = json | sarif
+    data_text    TEXT,                      -- format = text (비구조화 fallback)
+    created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
+
+    CONSTRAINT chk_raw_reports_data CHECK (
+        (format = 'text' AND data IS NULL AND data_text IS NOT NULL) OR
+        (format IN ('json', 'sarif') AND data IS NOT NULL AND data_text IS NULL)
+    )
+);
+
+CREATE INDEX idx_raw_reports_scanrun   ON raw_reports(scan_run_id, scanner);
+CREATE INDEX idx_raw_reports_target    ON raw_reports(target_name);
+CREATE INDEX idx_raw_reports_data_gin  ON raw_reports USING GIN (data)
+    WHERE data IS NOT NULL;
+```
+
+scanner별 `format` 값:
+
+| Scanner | 권장 format | 비고 |
+|---------|------------|------|
+| Trivy | `json` | `trivy image --format json` |
+| Grype | `json` | `grype --output json` |
+| Semgrep | `sarif` | `semgrep --sarif` |
+| gosec | `sarif` | `gosec -fmt sarif` |
+| Gitleaks | `json` | `gitleaks detect --report-format json` |
+| kube-linter | `json` | `kube-linter lint --format json` |
+| conftest | `json` | `conftest test --output json` |
+| Hadolint | `json` | `hadolint --format json` |
+| ShellCheck | `json` | `shellcheck --format json` |
+| Cosign/Notation | `json` | verification result JSON |
+| Crane | `json` | digest metadata JSON |
+
+---
+
+### findings
+
+normalized finding. `finding_id`는 scanner + target + rule 조합의 deterministic
+stable ID. `exception_status`는 `exception_reviews`와 sync해 join 없이 필터 가능하다.
+
+```sql
+CREATE TABLE findings (
+    id                 BIGSERIAL    PRIMARY KEY,
+    finding_id         VARCHAR(512) NOT NULL,          -- stable deterministic ID
+    scan_run_id        VARCHAR(255) NOT NULL REFERENCES scan_runs(id) ON DELETE CASCADE,
+    raw_report_id      BIGINT       REFERENCES raw_reports(id),
+    -- raw scanner 출력과의 연결. 재정규화 시 동일 raw_report_id 재사용
+    scanner            VARCHAR(100) NOT NULL,
+    category           VARCHAR(100) NOT NULL,
+    -- sast | secret | image_vulnerability | sbom | integrity | kubernetes
+    -- rbac | secret_ref | network | dockerfile | script | scan_health
+    severity           VARCHAR(50)  NOT NULL CHECK (severity IN ('Critical','High','Medium','Low','Info')),
+    target_type        VARCHAR(100),                   -- source | image | helm | yaml | dockerfile | script | rbac | secret_ref
+    target_name        TEXT,                           -- 파일 경로, 이미지 ref, k8s resource name
+    namespace          VARCHAR(255),
+    image_digest       VARCHAR(255),                   -- sha256:...
+    rule_id            VARCHAR(255),                   -- CVE ID, semgrep rule ID, policy ID
+    message            TEXT         NOT NULL,
+    remediation        TEXT,                           -- static catalog (AI sidecar는 별도)
+    exception_required BOOLEAN      NOT NULL DEFAULT FALSE,
+    exception_status   VARCHAR(50)  NOT NULL DEFAULT 'None'
+        CHECK (exception_status IN ('None','Required','Requested','Approved','Expired','Rejected')),
+    scan_status        VARCHAR(50)  NOT NULL
+        CHECK (scan_status IN ('Pass','Fail','Error','Skipped','Unsupported')),
+    created_at         TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    details            JSONB,                          -- scanner 특화 추가 필드
+
+    UNIQUE (finding_id, scan_run_id)
+);
+
+CREATE INDEX idx_findings_scan_run     ON findings(scan_run_id);
+CREATE INDEX idx_findings_filter       ON findings(scan_run_id, category, severity, exception_status, scan_status);
+CREATE INDEX idx_findings_digest       ON findings(image_digest) WHERE image_digest IS NOT NULL;
+CREATE INDEX idx_findings_namespace    ON findings(namespace)    WHERE namespace IS NOT NULL;
+CREATE INDEX idx_findings_raw_report   ON findings(raw_report_id);
+CREATE INDEX idx_findings_details_gin  ON findings USING GIN (details) WHERE details IS NOT NULL;
+```
+
+finding_id 생성 규칙:
+
+| category | 구성 요소 |
+|----------|----------|
+| `image_vulnerability` | `<imageRepository>/<imageDigest>/<vulnerabilityID>/<packageName>` |
+| `sast`, `secret` | `<scanner>/<filePath>/<ruleID>/<lineHash>` |
+| `kubernetes`, `rbac` | `<scanner>/<namespace>/<resourceKind>/<resourceName>/<ruleID>` |
+| `dockerfile`, `script` | `<scanner>/<filePath>/<ruleID>/<lineHash>` |
+| `scan_health` | `scan_health/<scanRunID>/<scanner>/<errorCode>` |
+
+---
+
+### scan_health
+
+scanner 실행 실패, unsupported target, stale DB/rule, missing artifact를 별도
+카테고리로 기록한다. 취약점 없음으로 오판하지 않도록 강제한다.
+
+```sql
+CREATE TABLE scan_health (
+    id           BIGSERIAL    PRIMARY KEY,
+    scan_run_id  VARCHAR(255) NOT NULL REFERENCES scan_runs(id) ON DELETE CASCADE,
+    scanner      VARCHAR(100),                         -- NULL이면 전체 pipeline 레벨 오류
+    target_name  TEXT,
+    status       VARCHAR(50)  NOT NULL CHECK (status IN ('OK','Warning','Fail','Skipped')),
+    reason       VARCHAR(100),
+    -- scanner_error | unsupported_target | missing_artifact | stale_db
+    -- stale_rules | registry_pull_failure | rbac_denied | optional_input_unavailable
+    -- ai_advisor_unavailable | ai_output_rejected
+    message      TEXT,
+    details      JSONB,
+    created_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_scan_health_scanrun ON scan_health(scan_run_id);
+CREATE INDEX idx_scan_health_status  ON scan_health(scan_run_id, status);
+```
+
+---
+
+### exception_reviews
+
+finding별 예외 승인 이력. status machine을 강제한다.
+
+```
+Required → Requested → Approved
+                     → Rejected
+Approved → Expired  (expires_at 기준 자동)
+```
+
+```sql
+CREATE TABLE exception_reviews (
+    id           BIGSERIAL    PRIMARY KEY,
+    finding_id   VARCHAR(512) NOT NULL,
+    scan_run_id  VARCHAR(255) NOT NULL REFERENCES scan_runs(id) ON DELETE CASCADE,
+    status       VARCHAR(50)  NOT NULL
+        CHECK (status IN ('Required','Requested','Approved','Expired','Rejected')),
+    owner        VARCHAR(255),                         -- 예외 신청자 또는 담당자
+    reason       TEXT,
+    expires_at   TIMESTAMPTZ,                          -- NULL이면 만료 없음
+    approved_by  VARCHAR(255),
+    approved_at  TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_exceptions_finding    ON exception_reviews(finding_id);
+CREATE INDEX idx_exceptions_status     ON exception_reviews(status);
+CREATE INDEX idx_exceptions_expiry     ON exception_reviews(expires_at) WHERE expires_at IS NOT NULL;
+CREATE INDEX idx_exceptions_scanrun    ON exception_reviews(scan_run_id);
+```
+
+`findings.exception_status`와 동기화 규칙:
+
+- `exception_reviews.status` 변경 시 대응하는 `findings.exception_status`를 같은
+  트랜잭션에서 업데이트한다.
+- `expires_at < now()` 이면 background job이 `status = 'Expired'`로 전환하고
+  `findings.exception_status`도 갱신한다.
+
+---
+
+### artifact_index
+
+Artifact Store 파일 참조. SBOM, evidence bundle, human report, scanner baseline,
+artifact-input.yaml의 경로와 메타데이터를 기록한다.
+
+```sql
+CREATE TABLE artifact_index (
+    id               BIGSERIAL    PRIMARY KEY,
+    scan_run_id      VARCHAR(255) NOT NULL REFERENCES scan_runs(id) ON DELETE CASCADE,
+    artifact_type    VARCHAR(100) NOT NULL,
+    -- sbom | integrity_report | evidence_bundle | human_report
+    -- exception_review_yaml | scanner_baseline | artifact_input
+    -- remediation_advisory | remediation_provenance
+    path             TEXT         NOT NULL,            -- Artifact Store 내 경로
+    checksum         VARCHAR(255),                     -- sha256:<hex>
+    schema_version   VARCHAR(50),                      -- security.finding/v1 등
+    scanner          VARCHAR(100),
+    scanner_version  VARCHAR(100),
+    db_baseline_date DATE,                             -- 취약점 DB 기준일
+    size_bytes       BIGINT,
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_artifact_index_scanrun ON artifact_index(scan_run_id, artifact_type);
+CREATE INDEX idx_artifact_index_path    ON artifact_index(path);
+```
+
+---
+
+### cluster_targets
+
+ClusterTarget CR의 k8s 미러. k8s watch 이벤트로 동기화한다. dashboard Targets
+메뉴의 list/get 응답 속도를 보장한다.
+
+```sql
+CREATE TABLE cluster_targets (
+    name                VARCHAR(255) PRIMARY KEY,       -- ClusterTarget.metadata.name
+    display_name        VARCHAR(255),
+    environment         VARCHAR(100),                   -- dev | final-check | prod
+    phase               VARCHAR(50),
+    -- Pending | Ready | Degraded | AuthFailed | Unreachable | PermissionDenied
+    kubernetes_version  VARCHAR(50),
+    capabilities        JSONB,
+    -- {
+    --   "scannerJobs": true,
+    --   "readOnlyInspection": true,
+    --   "trivyOperatorReports": false,
+    --   "hostPath": false,
+    --   "imageAccess": true,
+    --   "reportUpload": true
+    -- }
+    namespace_allowlist TEXT[],
+    conditions          JSONB,                          -- []metav1.Condition
+    last_validated_at   TIMESTAMPTZ,
+    last_credential_rotation_at TIMESTAMPTZ,
+    synced_at           TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_cluster_targets_phase ON cluster_targets(phase);
+CREATE INDEX idx_cluster_targets_env   ON cluster_targets(environment);
+```
+
+---
+
+## 마이그레이션 정책
+
+- 마이그레이션 도구: `golang-migrate/migrate` 또는 `goose`
+- 파일 위치: `backend/internal/db/migrations/`
+- 명명 규칙: `YYYYMMDDHHMMSS_<description>.up.sql` / `.down.sql`
+- 운영 환경에서 `down` 마이그레이션은 수동 실행만 허용한다.
+- PostgreSQL 버전: `18.x` 권장. `17.x` 이상에서 동작 확인 필요.
+
+---
+
+## 데이터 보안 정책
+
+- Secret raw value는 어떤 컬럼에도 저장하지 않는다.
+- `raw_reports.data JSONB`에 Secret redaction guard를 통과한 출력만 삽입한다.
+- `findings.message`, `findings.details`에도 redaction 적용 후 저장한다.
+- `cluster_targets` 테이블에 kubeconfig Secret 값을 저장하지 않는다.
+  `phase`, `capabilities`, `conditions` status 필드만 저장한다.
+- PostgreSQL encryption at rest는 Mgmt Cluster 인프라 레벨에서 적용한다.
+- `raw_reports` 접근 권한은 `backend` 서비스 계정에만 부여한다.
+  dashboard UI는 backend API를 통해서만 raw report를 조회한다.
