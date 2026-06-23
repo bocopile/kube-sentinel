@@ -52,10 +52,17 @@ type ClusterTargetStatus struct {
 }
 
 // TargetCapabilityStatus is the observed capability projection after discovery.
+// Mirrored by the backend into cluster_targets.capabilities (DATABASE.md).
 type TargetCapabilityStatus struct {
 	ScannerJobs          bool `json:"scannerJobs,omitempty"`
 	ReadOnlyInspection   bool `json:"readOnlyInspection,omitempty"`
 	TrivyOperatorReports bool `json:"trivyOperatorReports,omitempty"`
+	// ImageAccess and ReportUpload are probed in M1 (image pull / report store
+	// write tests); M0 leaves them false. HostPath is reserved and stays false
+	// in the first MVP (ARCHITECTURE.md).
+	ImageAccess  bool `json:"imageAccess,omitempty"`
+	ReportUpload bool `json:"reportUpload,omitempty"`
+	HostPath     bool `json:"hostPath,omitempty"`
 }
 
 // +kubebuilder:object:root=true

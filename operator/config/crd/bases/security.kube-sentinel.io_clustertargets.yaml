@@ -132,10 +132,21 @@ spec:
               state.
             properties:
               capabilities:
-                description: TargetCapabilityStatus is the observed capability projection
-                  after discovery.
+                description: |-
+                  TargetCapabilityStatus is the observed capability projection after discovery.
+                  Mirrored by the backend into cluster_targets.capabilities (DATABASE.md).
                 properties:
+                  hostPath:
+                    type: boolean
+                  imageAccess:
+                    description: |-
+                      ImageAccess and ReportUpload are probed in M1 (image pull / report store
+                      write tests); M0 leaves them false. HostPath is reserved and stays false
+                      in the first MVP (ARCHITECTURE.md).
+                    type: boolean
                   readOnlyInspection:
+                    type: boolean
+                  reportUpload:
                     type: boolean
                   scannerJobs:
                     type: boolean
