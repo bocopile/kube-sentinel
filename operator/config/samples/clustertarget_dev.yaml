@@ -1,0 +1,26 @@
+apiVersion: security.kube-sentinel.io/v1alpha1
+kind: ClusterTarget
+metadata:
+  name: dev-a
+spec:
+  displayName: dev-a
+  environment: dev
+  kubeconfigRef:
+    namespace: kube-sentinel-system
+    name: dev-a-kubeconfig
+    key: kubeconfig
+  targetNamespace: kube-sentinel-system
+  namespaceAllowlist: ["app", "platform"]
+  output:
+    reportTenantID: dev-a
+  capabilities:
+    scannerJobs: true
+    readOnlyInspection: true
+    trivyOperatorReports: false
+    hostPath: false
+  bootstrapPolicy:
+    installMissingNamespace: false
+    installManagedRBAC: true
+    installScannerResources: true
+    attachImagePullSecretRef:
+      name: scanner-pull-secret

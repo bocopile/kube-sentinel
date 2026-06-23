@@ -1,0 +1,13 @@
+apiVersion: security.kube-sentinel.io/v1alpha1
+kind: ScanRun
+metadata:
+  name: final-check-2026-06-run-1
+  annotations:
+    # Partial re-run scope: Full | ArtifactOnly | ClusterOnly | FinalDecisionOnly
+    security.kube-sentinel.io/retry-scope: Full
+spec:
+  assessmentRef:
+    name: final-check-2026-06
+  # Optional overrides; empty uses the SecurityAssessment values.
+  targets: []
+  profiles: []

@@ -1,0 +1,39 @@
+apiVersion: security.kube-sentinel.io/v1alpha1
+kind: SecurityAssessment
+metadata:
+  name: final-check-2026-06
+spec:
+  targets: ["dev-a"]
+  profiles:
+    - SourceSecurity
+    - ImageSupplyChain
+    - KubernetesConfig
+    - RBACAndSecretReference
+    - BuildAndDeploy
+  artifactInput:
+    sourceRef:
+      path: ./release-src
+    imageList:
+      - image: registry.example.com/app/api:1.2.3
+    digestList:
+      - image: registry.example.com/app/api
+        digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    manifestRef:
+      path: ./deploy/rendered
+  aiRemediation:
+    enabled: false
+    provider: none
+  features:
+    - name: trivy
+      enabled: true
+      config:
+        scanSchedule: "@every 6h"
+        severityThreshold: "HIGH"
+        useOperatorReports: true
+  output:
+    reportStore:
+      tenantID: "kube-sentinel"
+      retentionDays: 90
+  scanResources:
+    securityAssessment:
+      ttlSecondsAfterFinished: 86400
