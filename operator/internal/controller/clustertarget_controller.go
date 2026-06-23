@@ -21,7 +21,11 @@ type ClusterTargetReconciler struct {
 // +kubebuilder:rbac:groups=security.kube-sentinel.io,resources=clustertargets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=security.kube-sentinel.io,resources=clustertargets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=security.kube-sentinel.io,resources=clustertargets/finalizers,verbs=update
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// Secret access is deliberately get-only (narrow access to the sensitive
+// kubeconfig Secret, per docs/ARCHITECTURE.md). Reads MUST use the uncached
+// APIReader (mgr.GetAPIReader); the cached client is not used for Secrets so no
+// list/watch is required.
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get
 
 // Reconcile is the ClusterTarget reconcile loop. Skeleton: fetch + log only.
 // Preflight/discovery (kubeconfig load, RBAC check, version discovery) lands in M0/M2.

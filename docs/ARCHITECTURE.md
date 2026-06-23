@@ -121,11 +121,11 @@ Do not treat floating tags such as `latest` as a valid final-check baseline.
 | Mgmt Cluster | Kubernetes API server | `v1.36.2` validated, support `v1.34`-`v1.36` | Runs kube-sentinel CRDs, controller, target credential Secrets, Report Store integration, and dashboard/API. |
 | Biz Cluster | Kubernetes API server | support `v1.34`-`v1.36` | Target cluster inspected through kubeconfig. No kube-sentinel CRDs or per-cluster operator are installed. |
 | CLI | `kubectl` | match target minor, `v1.36.x` for validation | Used for preflight, manual validation, and troubleshooting. |
-| Controller build | Go | `1.26.4` validated, require `1.26.x` | Aligns with the Kubebuilder/controller-runtime baseline. |
-| Controller scaffold | Kubebuilder | `v4.15.0` | Initial project scaffold and CRD/controller conventions. |
-| Controller runtime | `sigs.k8s.io/controller-runtime` | `v0.24.1` | Reconciler, client, cache, server-side apply, status updates, envtest. |
-| CRD generation | `controller-tools` / `controller-gen` | `v0.21.0` | CRD, RBAC marker, and deepcopy generation. |
-| Local test API | `envtest` | Kubernetes `v1.36.x` | Controller tests must pin envtest instead of depending on the developer machine. |
+| Controller build | Go | `go.mod` directive `1.23.0`, built with Go `1.26.x` toolchain | Skeleton baseline. Bump in lockstep with controller-runtime if upgraded. |
+| Controller scaffold | Kubebuilder layout | v4-compatible, hand-scaffolded (no `kubebuilder` CLI) | `operator/PROJECT` records the layout; codegen via `controller-gen`. |
+| Controller runtime | `sigs.k8s.io/controller-runtime` | `v0.19.3` (k8s client libs `k8s.io/*` `v0.31.2`) | Reconciler, client, cache, server-side apply, status updates, envtest. |
+| CRD generation | `controller-tools` / `controller-gen` | `v0.16.5` | CRD, RBAC marker, and deepcopy generation. |
+| Local test API | `envtest` | Kubernetes `v1.31.x` | Controller tests pin envtest instead of depending on the developer machine. |
 | Manifest rendering | Helm | `v4.2.2` validated | Renders customer charts and kube-sentinel installation manifests. |
 | Manifest rendering | Kustomize | `v5.8.1` validated | Optional render path for Kustomize-based delivery manifests. |
 | Utility CLI | `jq` | `1.8.1` validated | JSON report and status processing in scripts. |
@@ -919,7 +919,8 @@ Mgmt Cluster resources:
 - `scanruns`: get, list, watch, create, update, patch, delete
 - `scanruns/status`: get, update, patch
 - `scanruns/finalizers`: update
-- `secrets`: get
+- `secrets`: get (list/watch는 부여하지 않는다. controller-runtime cached client는 watch한 타입에 list/watch가
+  필요하므로, kubeconfig Secret은 cached client가 아니라 uncached `APIReader`(`mgr.GetAPIReader`)로 get만 수행한다)
 - `configmaps`: get, list, watch, create, update, patch, delete
 - `events`: create, patch
 

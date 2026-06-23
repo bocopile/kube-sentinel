@@ -35,18 +35,30 @@ PoC는 수직 slice 단계로 구현한다.
 
 이 절이 첫 구현 PR/블록(P0) 범위의 단일 정본이다(README "다음 구현 단계", ORCHESTRATOR/PROMPTS P0는 이 절을 참조한다).
 첫 코드 블록은 모든 sensor를 한 번에 구현하지 않으며, 모노레포 3-모듈 중 `operator/` skeleton만 초기화한다.
-다음 항목을 생성한다.
 
-- `operator/` Go module(`github.com/bocopile/kube-sentinel/operator`)과 controller-runtime project
-  skeleton.
-  임시 root `go.mod` placeholder는 이 블록에서 `operator/go.mod`로 대체하고 root `go.mod`는 제거한다.
-- `ClusterTarget`, `SecurityAssessment`, `ScanRun` API type (cluster-scoped)
-- status patching이 포함된 빈 reconciler
-- feature registry interface와 Feature orchestrator skeleton
-- Artifact Store backend plugin interface
-- registry ordering, `profiles[]`/`features[]` merge, unknown profile/unknown feature validation
-  unit test
-- `orchestrator init`으로 생성한 `.orchestrator/config.yaml`
+P0에서 생성 완료된 항목(`go build ./... && go test ./...` 통과):
+
+- ✅ `operator/` Go module(`github.com/bocopile/kube-sentinel/operator`)과 controller-runtime skeleton.
+  임시 root `go.mod` placeholder는 `operator/go.mod`로 대체하고 root `go.mod`는 제거함.
+- ✅ `ClusterTarget`, `SecurityAssessment`, `ScanRun` API type (cluster-scoped) + deepcopy + 생성된 CRD/RBAC/sample.
+- ✅ 빈 reconciler 3종(status subresource 활성화; 실제 status patch와 discovery는 M0/M2).
+- ✅ feature registry interface와 Feature orchestrator skeleton(`internal/feature`).
+- ✅ Artifact Store backend plugin interface(`internal/artifactstore`, write+read; 실제 backend 구현은 M1).
+- ✅ registry ordering + `profiles[]`/`features[]` merge resolver(`MergeFeatures`, 정본 profile→feature/umbrella 표 코드화) +
+  unknown profile/unknown feature 분리 unit test.
+
+P0에서 stub/placeholder로 두고 후속 milestone으로 미룬 항목:
+
+- scanResources allowlist 확장 필드(`resources`/`nodeSelector`/`tolerations`/`scanResources.trivy.*`) — CRD에는 현재
+  `securityAssessment.ttlSecondsAfterFinished`만 존재. 나머지는 M2/M5에서 타입·CRD에 추가한다.
+- `ClusterTarget.status.capabilities` 관측 필드(`imageAccess`/`reportUpload`/`hostPath`) — discovery 구현(M0/M2) 시 추가.
+- normalized Finding의 canonical `security.finding/v1` 전체 스키마(`target_type`/`rule_id`/`namespace`/`details`/`raw_report_id` 등) —
+  operator `feature.Finding`은 placeholder이며 정본은 DATABASE `findings`; `internal/normalizer` DTO는 M3에서 구현한다.
+- `TargetRunStatus` 실패 taxonomy(`AuthFailed`/`Unreachable`/`PermissionDenied`의 phase/reason 매핑) — M2에서 정의·구현.
+- operator PostgreSQL 연결(`pgx` pool)과 마이그레이션 조율(backend 소유 migration 선행 적용) — M1에서 배선한다.
+
+`.orchestrator/config.yaml`은 생성하지 않는다(orchestrator는 선택적 runner이며 정본 진행은 Claude Code 직접 구현이다.
+[ORCHESTRATOR.md](./ORCHESTRATOR.md) 참조).
 
 `backend/`/`frontend/` 모듈 디렉터리는 첫 블록 범위가 아니며 각각 후속 milestone에서 초기화한다.
 이후 S0과 S1을 진행한다.

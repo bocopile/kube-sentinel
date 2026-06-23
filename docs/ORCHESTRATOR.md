@@ -5,11 +5,13 @@
 
 ## 현재 bootstrap 상태
 
-이 리포지터리는 pre-skeleton Go 상태다.
-임시 root `go.mod`(첫 PR에서 `operator/go.mod`로 대체·제거 예정)와 계획 문서는 존재하지만 3-모듈 정본의 `operator/go.mod`와
-Kubebuilder가 생성한 `operator/cmd/`, `operator/api/`, `operator/internal/`, `operator/config/`,
-`operator/PROJECT`, `.orchestrator/config.yaml` 파일은 아직 없다.
-첫 구현 블록의 정확한 생성 범위는 [ROADMAP.md](./ROADMAP.md) §첫 구현 블록을 단일 정본으로 따른다.
+이 리포지터리는 operator 스켈레톤이 생성된 상태다(P0 완료).
+3-모듈 정본의 `operator/go.mod`와 `operator/cmd/`, `operator/api/v1alpha1/`(ClusterTarget/SecurityAssessment/ScanRun
+CRD 타입 + deepcopy), `operator/internal/`(controller·feature registry), `operator/config/`(생성된 CRD/RBAC/samples),
+`operator/PROJECT`가 존재하며 `go build ./... && go test ./...`이 통과한다(검사 로직은 M0/M2/M3 TODO).
+임시 root `go.mod`는 `operator/go.mod`로 대체되어 제거됐다. `.orchestrator/config.yaml`은 사용하지 않는다(orchestrator는
+선택적 runner이며 정본 진행은 Claude Code 직접 구현이다).
+operator 디렉터리를 재초기화(`kubebuilder init`)하지 말고, 다음 작업은 [ROADMAP.md](./ROADMAP.md)의 후속 milestone(M0/M2)을 따른다.
 
 따라서 유효한 실행 방식은 두 가지다.
 

@@ -461,11 +461,13 @@ type AssessmentSummary struct {
 - profile base set에 `features[]`를 선언 순서대로 적용한다(`enabled=true`는 추가, `enabled=false`는 제거, 동일 feature
   ID의 config는 마지막 항목이 우선).
   최종 enabled set = (profiles 확장 ∪ `features[].enabled=true`) − (`features[].enabled=false`).
-- 알 수 없는 `profiles[]` 값은 `ConfigError`로 status에 기록하고 해당 profile만 무시한다(unknown feature와 동일).
+- `profiles[]`는 CRD `+kubebuilder:validation:Enum`으로 검증되어 알 수 없는 값은 API admission에서 거부된다(status까지 도달하지 않음).
+  반면 free-form인 `features[].name`의 unknown 값은 `ConfigError`로 status에 기록하고 해당 feature만 무시한다(`features[].name` 한정).
 - `SecurityAssessment.spec.targets[]`가 존재하지 않는 `ClusterTarget`을 참조하면 `ScanRun`을 `Failed`로 기록한다.
 - target kubeconfig Secret 연결 실패, API server unreachable, RBAC denied는 `ClusterTarget.status`와
   `ScanRun.status.targets[]`에 분리해서 기록한다.
-- `Configure()` 실패는 전체 reconcile 실패로 처리하되, 이미 정상 적용된 리소스를 무리하게 삭제하지 않는다.
+- feature의 `Validate()`/`Build()` config 검증 실패는 해당 feature를 `ConfigError`로 기록하고, 전체 reconcile은
+  이미 정상 적용된 리소스를 무리하게 삭제하지 않는다.
 - feature별 기본값은 각 feature package에 두고, sample YAML은 기본값을 설명하는 용도로만 사용한다.
 
 ---
@@ -979,11 +981,11 @@ Biz Cluster 접근은 현재 버전에 포함하되, 실시간 런타임 탐지 
 | Overview | 납품 가능 여부를 빠르게 판단 | 전체 Pass/Fail, Critical/High 수, scan health, 예외 필요 항목, 마지막 스캔 시각 | 실패 원인 Top 5 drill-down |
 | Targets | Biz Cluster 등록과 접근 상태 확인 | ClusterTarget, connection phase, namespace allowlist, capability, last validation time | cluster add/import, preflight 실패 원인 확인 |
 | Assessments | 검사 실행과 workflow 상태 확인 | Code / Artifact Scan, Biz Cluster Scan, Full Final Check, retry/resume state | 실패 workflow 재실행 |
-| Findings | 보안 도메인별 finding 분석 (기본 OPEN 프리셋) | 6개 보안 도메인 탭 — 소스 저장소 / 컨테이너 이미지 / 무결성·공급망 / K8s 실행 환경 / 스캔 상태·산출물. `category`+`target_cluster`(NULL=매니페스트, 값=applied) 프리셋으로 구분 | finding 상세, [예외 요청]/[오탐]/[조치 완료] |
+| Findings | 보안 도메인별 finding 분석 (기본 OPEN 프리셋) | 5개 보안 도메인 탭 — 소스 저장소 / 컨테이너 이미지 / 무결성·공급망 / K8s 실행 환경 / 스캔 상태·산출물. `category`+`target_cluster`(NULL=매니페스트, 값=applied) 프리셋으로 구분 | finding 상세, [예외 요청]/[오탐]/[조치 완료] |
 | Reports | 검사 결과 보고서와 증적 확인 | final-check report(Markdown, optional PDF), evidence bundle, raw reports, normalized findings, scan health summary | report/evidence export |
 | 예외 관리 (Governance) | 개선/예외/재점검 추적 | 개선 권고, 예외 요청·승인 후보, 승인/만료 예외, 재스캔 상태 | 예외 요청/승인/만료/재점검 상태 확인 |
 
-세부 검사 영역인 6개 보안 도메인(소스 저장소/컨테이너 이미지/무결성·공급망/K8s 실행 환경/스캔 상태·산출물)은
+세부 검사 영역인 5개 보안 도메인(소스 저장소/컨테이너 이미지/무결성·공급망/K8s 실행 환경/스캔 상태·산출물)은
 top-level 메뉴가 아니라 Findings 내부 탭으로 제공한다.
 예외 승인은 finding을 숨기지 않는다 — 기본 OPEN 프리셋은 쿼리 필터일 뿐이며 `Approved`/`Expired` finding도
 DB·예외 관리·상세·PDF·evidence에 그대로 유지된다(스캔 단계 제외·DB 삭제 없음).

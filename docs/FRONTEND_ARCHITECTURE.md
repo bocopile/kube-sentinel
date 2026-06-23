@@ -47,7 +47,7 @@ Final Check Dashboard
 | Overview | 납품 가능 여부 요약 | Pass/Fail, Critical/High, failed scans, missing artifacts, exception-required count |
 | Targets | Biz Cluster 등록/상태 확인 | ClusterTarget list, cluster add/import, connection phase, namespace allowlist, last validation time |
 | Assessments | 검사 실행과 workflow 상태 확인 | Code / Artifact Scan, Biz Cluster Scan, Full Final Check, preflight status, retry/resume |
-| Findings | 보안 도메인별 finding 분석 (기본 OPEN 프리셋) | 6개 보안 도메인 탭 — 1) 소스 저장소 `sast,secret,dockerfile,script,kubernetes/rbac(target_cluster IS NULL)`, 2) 컨테이너 이미지 `image_vulnerability,sbom`, 3) 무결성·공급망 `integrity`, 4) K8s 실행 환경 `kubernetes/rbac(target_cluster IS NOT NULL),secret_ref,network`, 5) 스캔 상태·산출물 `scan_health`. 공통 severity/scanner/status 필터 공유 |
+| Findings | 보안 도메인별 finding 분석 (기본 OPEN 프리셋) | 5개 보안 도메인 탭 — 1) 소스 저장소 `sast,secret,dockerfile,script,kubernetes/rbac(target_cluster IS NULL)`, 2) 컨테이너 이미지 `image_vulnerability,sbom`, 3) 무결성·공급망 `integrity`, 4) K8s 실행 환경 `kubernetes/rbac(target_cluster IS NOT NULL),secret_ref,network`, 5) 스캔 상태·산출물 `scan_health`. 공통 severity/scanner/status 필터 공유 |
 | Reports | 보고서 export와 증적 | final-check report(Markdown source, optional PDF), evidence bundle, raw report/normalized finding download(SARIF/JSON), scan health summary |
 | 예외 관리 (Governance) | 예외 워크플로와 개선 권고 추적 | finding별 [예외 요청]/[오탐]/[조치 완료], 상태머신(Required→Requested→Approved/Rejected→Expired), owner/reason/expiry/approver, expired 예외 재평가, remediation 추적. 개선 권고·예외 검토 PDF export |
 
@@ -57,14 +57,14 @@ Final Check Dashboard
 
 | 검사 그룹 | 프로파일 | 실행 도구/방식 | 결과 메뉴 |
 |----------|----------|---------------|----------|
-| Code / Artifact Scan | Source Security Scan | SonarQube, Semgrep, gosec, Gitleaks | Assessments, Findings > Source & Secrets |
-| Code / Artifact Scan | Image Supply Chain Scan | Trivy/Grype, Syft, Cosign/Notation, Crane | Assessments, Findings > Images & Integrity |
-| Code / Artifact Scan | Manifest & RBAC Manifest Scan | Helm render, kube-linter, conftest, RBAC manifest policy | Assessments, Findings > Kubernetes Config & RBAC |
-| Code / Artifact Scan | Build & Deploy Scan | Hadolint, ShellCheck | Assessments, Findings > Dockerfile & Scripts |
-| Biz Cluster Scan | Applied Workload Config Scan | read-only applied workload inspection | Assessments, Findings > Kubernetes Config & RBAC |
-| Biz Cluster Scan | Applied RBAC Scan | read-only applied RBAC inspection | Assessments, Findings > Kubernetes Config & RBAC |
-| Biz Cluster Scan | Secret Reference Scan | env/envFrom/volume/ServiceAccount token reference inspection | Assessments, Findings > Source & Secrets |
-| Biz Cluster Scan | Exposure Scan | Service/Ingress exposure inspection | Assessments, Findings > Kubernetes Config & RBAC |
+| Code / Artifact Scan | Source Security Scan | SonarQube, Semgrep, gosec, Gitleaks | Assessments, Findings > 소스 저장소 |
+| Code / Artifact Scan | Image Supply Chain Scan | Trivy/Grype, Syft, Cosign/Notation, Crane | Assessments, Findings > 컨테이너 이미지 / 무결성·공급망 |
+| Code / Artifact Scan | Manifest & RBAC Manifest Scan | Helm render, kube-linter, conftest, RBAC manifest policy | Assessments, Findings > 소스 저장소 (`kubernetes,rbac` / `target_cluster IS NULL`) |
+| Code / Artifact Scan | Build & Deploy Scan | Hadolint, ShellCheck | Assessments, Findings > 소스 저장소 (`dockerfile,script`) |
+| Biz Cluster Scan | Applied Workload Config Scan | read-only applied workload inspection | Assessments, Findings > K8s 실행 환경 |
+| Biz Cluster Scan | Applied RBAC Scan | read-only applied RBAC inspection | Assessments, Findings > K8s 실행 환경 |
+| Biz Cluster Scan | Secret Reference Scan | env/envFrom/volume/ServiceAccount token reference inspection | Assessments, Findings > K8s 실행 환경 (`secret_ref`) |
+| Biz Cluster Scan | Exposure Scan | Service/Ingress exposure inspection | Assessments, Findings > K8s 실행 환경 (`network`) |
 | Full Final Check | Full Final Check | Code / Artifact Scan 이후 Biz Cluster preflight와 Biz Cluster Scan 실행 | Overview, Findings, Reports, Governance |
 
 Biz Cluster Scan 실행 버튼은 선택한 `ClusterTarget`이 `Ready`가 아니면 비활성화한다.
@@ -89,7 +89,7 @@ CRD/bootstrap capability 부족 중 하나로 표시한다.
 | Scan status | Pass, Fail, Error, Skipped, Unsupported |
 | Exception status | None, Required, Requested, Approved, Expired, Rejected |
 | View preset | **OPEN(기본)** = 조치 필요(`scan_status IN (Fail,Error)` AND `exception_status IN (None,Required,Requested,Rejected,Expired)`). Approved 포함·전체 토글 가능. OPEN은 새 컬럼이 아니라 쿼리 프리셋이며 finding을 숨기지 않는다 |
-| Report domain / Target source | 6개 보안 도메인(category 프리셋) · Code/Artifact(`target_cluster IS NULL`) / Biz applied(`target_cluster IS NOT NULL`) / All |
+| Report domain / Target source | 5개 보안 도메인(category 프리셋) · Code/Artifact(`target_cluster IS NULL`) / Biz applied(`target_cluster IS NOT NULL`) / All |
 
 ## Cluster List
 
@@ -200,7 +200,7 @@ PostgreSQL이 query 정본이며, artifact store의 `manifest.json`은 `artifact
 - 최종 판정 실패 원인을 Overview에서 바로 보여준다.
 - 스캔 실패와 필수 산출물 누락은 취약점 없음으로 처리하지 않고 Scan Health에서 Fail로 표시한다.
 - Secret 원문 값은 UI, log, artifact 어디에도 표시하지 않는다.
-- 6개 보안 도메인(소스 저장소/컨테이너 이미지/무결성·공급망/K8s 실행환경/스캔 상태·산출물)은 top-level
+- 5개 보안 도메인(소스 저장소/컨테이너 이미지/무결성·공급망/K8s 실행환경/스캔 상태·산출물)은 top-level
   메뉴가 아니라 Findings 내부 탭으로 제공하고, `findings.category`+`target_cluster`(NULL=매니페스트, 값=applied) 프리셋 필터로 구분한다.
 - 예외 승인은 finding을 숨기지 않는다. 기본 Findings 뷰는 OPEN 프리셋(조치 필요)만 보이지만 이는 쿼리 필터일 뿐이며,
   `Approved`/`Expired` finding도 DB·예외 관리 메뉴·상세·PDF·evidence에 그대로 유지된다(스캔 단계 제외·DB 삭제 없음). 상태만 `Approved`로 바꾸고 만료일을 표시한다.

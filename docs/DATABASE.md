@@ -57,10 +57,10 @@ CREATE TABLE scan_runs (
     --   "exception_required_count": 0,
     --   "scan_health_fail_count": 0,
     --   "scanner_baseline_date": "2026-06-18",
-    --   "final_decision": {        -- security.finalDecision/v1 object snapshot
+    --   "final_decision": {        -- security.finalDecision/v1 object snapshot (canonical camelCase 키 유지)
     --     "status": "Fail",
     --     "reasons": [ { "code": "critical_finding", "severity": "Critical", "count": 3 } ],
-    --     "decided_at": "2026-06-18T12:00:00Z"
+    --     "decidedAt": "2026-06-18T12:00:00Z"
     --   }
     -- }
     created_at           TIMESTAMPTZ  NOT NULL DEFAULT now(),

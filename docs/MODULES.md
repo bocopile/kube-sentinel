@@ -270,7 +270,7 @@ npm run test
 │                                                                   │
 │   - operator        CRD, reconciler, feature orchestrator,        │
 │                     normalizer, remote apply, PG + evidence write │
-│   - PostgreSQL      scan_run, raw_report, finding, artifact_index │
+│   - PostgreSQL      scan_runs, raw_reports, findings, artifact_index │
 │   - Artifact Store  SBOM, baseline, evidence bundle, export       │
 │   - backend         REST API server, k8s dynamic client, PG read  │
 │   - frontend        React SPA, Final Check Dashboard              │
@@ -293,7 +293,7 @@ apply 로 생성된 scanner Job·RBAC·namespace 만 존재한다.
 
 | 통신 방향 | 방식 | 비고 |
 |----------|------|------|
-| operator → PostgreSQL | `lib/pq` 또는 `pgx` | scan_run, cluster_target mirror, raw_report, finding, scan_health, final_decision, exception_review, artifact_index write |
+| operator → PostgreSQL | `lib/pq` 또는 `pgx` | scan_runs, cluster_targets mirror, raw_reports, findings, scan_health, `scan_runs.final_decision`, exception_reviews, artifact_index write |
 | operator → Artifact Store | ArtifactStore interface | SBOM, scanner baseline, artifact-input manifest, exported report, evidence bundle write |
 | backend → PostgreSQL | `pgx` | read-only query |
 | backend → Artifact Store | ArtifactReader interface | GetArtifact, GenerateDownloadURL |
