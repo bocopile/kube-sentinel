@@ -187,7 +187,7 @@ artifact-input manifest, exported report)을 보관한다.
 | --- | --- | --- |
 | Trivy Operator | `v0.31.1` | Optional read-only `VulnerabilityReport` input only. kube-sentinel does not install or operate Trivy Operator in the first MVP. |
 | Kyverno/Gatekeeper policy bundles | organization-approved policy version | Optional policy-pack input for `kubernetes_manifest`. First MVP baseline은 kube-linter/conftest이며 kube-sentinel은 Kyverno/Gatekeeper controller를 설치·운영하지 않는다. |
-| Kubescape | organization-approved CLI version | Optional CLI-only scanner plugin input for `kubernetes_manifest`. First MVP baseline은 kube-linter/conftest를 교체하지 않는다. installed controller 형태는 "Biz Cluster에 operator를 두지 않는다" 원칙과 충돌하므로 채택하지 않는다. |
+| Kubescape | organization-approved CLI version | **Phase2 plugin 후보(first-scope 비채택)**. 향후 `kubernetes_manifest`용 CLI-only scanner plugin으로만 검토하며 first MVP baseline kube-linter/conftest를 교체하지 않는다. installed controller 형태는 "Biz Cluster에 operator를 두지 않는다" 원칙과 충돌하므로 채택하지 않는다(PLAN/SECURITY_ASSESSMENT와 동일하게 Phase2). |
 | rbac-police | organization-approved version | Optional CLI input for `rbac_review`. First MVP baseline은 conftest + read-only applied RBAC inspection이다. |
 | Artifact Store backend | deployment-specific | Filesystem, S3-compatible, MinIO, SeaweedFS, NFS/PVC 등에서 선택한다. 코드와 API는 backend plugin interface 뒤에 둔다. |
 
@@ -479,7 +479,7 @@ Feature별 책임:
 | `image_integrity` | digest, signature, approved digest list 검증 |
 | `sbom` | Syft/Trivy SBOM 생성 및 artifact 저장 |
 | `kubernetes_manifest` | Helm/YAML/kube-linter/conftest 기반 manifest finding 생성 |
-| `applied_cluster_config` | Biz Cluster read-only workload/securityContext/volume/image 설정 검사 |
+| `applied_cluster_config` | Biz Cluster read-only workload/securityContext/volume/image 설정 + Service/Ingress 노출(exposure) 검사. `kubernetes`와 `network` category를 생성한다 |
 | `rbac_review` | RBAC 과권한, wildcard, cluster-admin binding 검사 |
 | `dockerfile_scan` | Hadolint 기반 Dockerfile 위험 설정 finding 생성 |
 | `script_scan` | ShellCheck 기반 deployment script 위험 finding 생성 |
@@ -529,6 +529,10 @@ umbrella `features[].name` 확장:
 `target_preflight`/`bootstrap`/`report_export`는 profile과 무관한 lifecycle feature이고,
 `trivy_operator_reports`는 `ImageSupplyChain`과 target capability 허용 시, `remediation_enrichment`는
 `aiRemediation.enabled=true`일 때만 enabled된다.
+`rbac_review`는 `KubernetesConfig`(Code/Artifact Scan, manifest, `target_cluster=NULL`)와
+`RBACAndSecretReference`(Biz Cluster Scan, applied, `target_cluster=<name>`) 양쪽에 매핑된다. 두 profile이 모두
+선택되면 워크플로별로 1회씩 실행되어 각 워크플로의 `target_cluster`·finding_id 규칙([DATABASE.md](./DATABASE.md))으로
+구분된 finding을 생성한다(중복 집계 아님).
 
 **features 병합 규칙** — orchestrator는 다음 순서로 enabled feature set을 deterministic하게 resolve한다.
 
@@ -542,10 +546,11 @@ umbrella `features[].name` 확장:
 6. 최종 enabled set = (profiles 확장 ∪ `features[].enabled=true`) − (`features[].enabled=false`).
    priority 오름차순, 같은 priority는 feature ID 사전순으로 정렬한다.
 
-umbrella 명칭·registry feature ID·profile 매핑 표 어디에도 없는 `features[].name` 또는 `profiles[]` 값은
-`ConfigError`로 status(`status.features[].reason=ConfigError` 또는 `status.conditions`)에 기록하고 해당 항목만
-무시한다.
-unknown 항목 하나가 전체 scan을 실패시키지 않으며, 나머지 valid feature는 정상 실행한다.
+`profiles[]`는 CRD `+kubebuilder:validation:Enum`으로 검증되므로 알 수 없는 값은 API admission에서 거부되어
+status까지 도달하지 않는다(정본 enum은 [PLAN.md](./PLAN.md) `ScanProfile`). 반면 free-form인 `features[].name`이
+umbrella 명칭·registry feature ID 어디에도 없으면 `ConfigError`로 status(`status.features[].reason=ConfigError`
+또는 `status.conditions`)에 기록하고 해당 feature만 무시한다.
+unknown `features[].name` 하나가 전체 scan을 실패시키지 않으며, 나머지 valid feature는 정상 실행한다.
 
 ## Reconcile flow
 

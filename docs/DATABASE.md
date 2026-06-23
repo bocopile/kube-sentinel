@@ -281,11 +281,20 @@ CREATE INDEX idx_exceptions_expiry     ON exception_reviews(expires_at) WHERE ex
 CREATE INDEX idx_exceptions_scanrun    ON exception_reviews(scan_run_id);
 ```
 
+`Required` row 생성 규칙:
+
+- operator가 final decision을 확정하는 reconcile 단계에서, `exception_required=true`이고 아직 유효한
+  `Approved` carry-over가 없는 finding마다 `exception_reviews`에 `status='Required'` row를 자동 생성한다
+  (`findings.exception_status`도 `Required`로 동기화). 사용자 액션이 아니라 operator가 만든다.
+- dashboard `[예외 요청]` 버튼은 이 `Required` row를 `Requested`로 전환하는 `PATCH /api/v1/exceptions/{id}`이며,
+  별도 생성 endpoint는 두지 않는다(MVP).
+
 `findings.exception_status`와 동기화 규칙:
 
 - `exception_reviews.status` 변경 시 대응하는 `findings.exception_status`를 같은 트랜잭션에서 업데이트한다.
-- `expires_at < now()` 이면 background job이 `status = 'Expired'`로 전환하고 `findings.exception_status`도
-  갱신한다.
+- 만료 처리는 operator가 주기 reconcile(`RequeueAfter`, PoC 기본 60초 sweep)로 수행한다. `expires_at < now()`인
+  `Approved` row를 `status='Expired'`로 전환하고 `findings.exception_status`도 같은 트랜잭션에서 갱신한다
+  (backend cron이나 별도 worker가 아니라 operator가 단일 write 주체다).
 
 재스캔 carry-over 규칙(같은 `finding_id`가 새 ScanRun에서 다시 보고될 때, operator가 적용):
 

@@ -92,8 +92,9 @@ Trivy Operator `VulnerabilityReport`는 유지한다.
 | `BuildAndDeploy` | `dockerfile_scan`, `script_scan` | `dockerfile`, `script` |
 | `RBACAndSecretReference` | `applied_cluster_config`, `rbac_review`, `secret_reference` | `kubernetes`, `rbac`, `secret_ref`, `network` |
 
-`spec.features[]`는 위 base set에 enable/disable·config override를 적용하고, unknown profile은 `ConfigError`로
-기록하고 무시한다.
+`spec.features[]`는 위 base set에 enable/disable·config override를 적용한다. `profiles[]`는 `ScanProfile` CRD
+enum이라 알 수 없는 값은 admission에서 거부되며, unknown→`ConfigError`(기록 후 무시)는 free-form `features[].name`에만
+적용된다.
 상세 병합 규칙은 ARCHITECTURE.md를 따른다.
 
 검사 절차는 권한 모델과 실패 원인이 다르므로 `Code / Artifact Scan`과 `Biz Cluster Scan`으로 분리한다.

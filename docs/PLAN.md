@@ -48,7 +48,7 @@ PoC는 한 번에 4개 센서를 모두 붙이지 않고, 다음 세로 경로�
 | Stage | 범위 | 통과 기준 |
 |-------|------|----------|
 | S0 | Mgmt/Biz Cluster 권한과 Report Store 연결 사전 검증 | Biz Cluster kubeconfig, target namespace, read-only RBAC, image access, report store write 확인 |
-| S0.5 | 납품 산출물 보안 점검 파이프라인 베이스라인 | SAST, Secret, Image, SBOM/무결성, Manifest/RBAC, Dockerfile/Script 스캔 결과 생성 |
+| S0.5 | 납품 산출물 보안 점검 파이프라인 베이스라인 | SAST/Secret/Manifest/RBAC/Dockerfile/Script 스캔 결과 생성·정규화. Image/SBOM/무결성은 scanner config·fixture·baseline placeholder만 두고 실제 생성은 S3/M5(P7) |
 | S1 | Report Store + Security Finding Schema + Trivy fixture 검증 | Security Assessment fixture가 PostgreSQL `raw_reports`/`findings`와 evidence export artifact로 적재 |
 | S2 | `ClusterTarget` + `SecurityAssessment` -> Security Assessment | Mgmt controller가 Biz Cluster에 assessment Job/CronJob을 remote apply |
 | S3 | Trivy, optional VulnerabilityReport, applied cluster config scan 순차 추가 | 각 profile enable/disable, status, report artifact 검증 |
@@ -279,6 +279,44 @@ type ClusterTargetBootstrapPolicy struct {
     InstallManagedRBAC       bool            `json:"installManagedRBAC,omitempty"`
     InstallScannerResources  bool            `json:"installScannerResources,omitempty"`
     AttachImagePullSecretRef *LocalObjectRef `json:"attachImagePullSecretRef,omitempty"`
+}
+
+// ScanProfile은 profile→registry feature ID 정본 표(ARCHITECTURE.md)로 확장되는
+// 상위 검사 프로파일이다. CRD enum으로 검증하므로 알 수 없는 값은 API admission에서
+// 거부된다(reconcile status에 도달하지 않는다).
+// +kubebuilder:validation:Enum=SourceSecurity;ImageSupplyChain;KubernetesConfig;RBACAndSecretReference;BuildAndDeploy
+type ScanProfile string
+
+const (
+    ProfileSourceSecurity         ScanProfile = "SourceSecurity"
+    ProfileImageSupplyChain       ScanProfile = "ImageSupplyChain"
+    ProfileKubernetesConfig       ScanProfile = "KubernetesConfig"
+    ProfileRBACAndSecretReference ScanProfile = "RBACAndSecretReference"
+    ProfileBuildAndDeploy         ScanProfile = "BuildAndDeploy"
+)
+
+type TargetOutputSpec struct {
+    ReportTenantID string `json:"reportTenantID,omitempty"`
+}
+
+// TargetCapabilitySpec은 운영자가 '허용'하는 capability를 선언한다(4필드).
+// TargetCapabilityStatus는 discovery로 '관측'한 결과이며, 선언 불가한
+// imageAccess/reportUpload(런타임 probe 결과)까지 포함하는 superset(6필드)이다.
+// hostPath는 reserved이며 first MVP에서 항상 false다.
+type TargetCapabilitySpec struct {
+    ScannerJobs          bool `json:"scannerJobs,omitempty"`
+    ReadOnlyInspection   bool `json:"readOnlyInspection,omitempty"`
+    TrivyOperatorReports bool `json:"trivyOperatorReports,omitempty"`
+    HostPath             bool `json:"hostPath,omitempty"`
+}
+
+type TargetCapabilityStatus struct {
+    ScannerJobs          bool `json:"scannerJobs,omitempty"`
+    ReadOnlyInspection   bool `json:"readOnlyInspection,omitempty"`
+    TrivyOperatorReports bool `json:"trivyOperatorReports,omitempty"`
+    ImageAccess          bool `json:"imageAccess,omitempty"`  // discovery 전용(M1 probe)
+    ReportUpload         bool `json:"reportUpload,omitempty"` // discovery 전용(M1 probe)
+    HostPath             bool `json:"hostPath,omitempty"`     // reserved, 항상 false
 }
 
 type SecurityAssessmentSpec struct {
@@ -629,7 +667,7 @@ export로만 사용한다.
 | `scanner` | `semgrep`, `gitleaks`, `trivy`, `grype`, `syft`, `cosign`, `kube-linter`, `conftest`, `hadolint`, `shellcheck` 등 |
 | `category` | `sast`, `secret`, `image_vulnerability`, `sbom`, `integrity`, `kubernetes`, `rbac`, `secret_ref`, `network`, `dockerfile`, `script`, `scan_health` |
 | `severity` | `Critical`, `High`, `Medium`, `Low`, `Info` |
-| `target_type` | `source`, `image`, `helm`, `yaml`, `dockerfile`, `script`, `rbac`, `secret_ref` |
+| `target_type` | `source`, `image`, `helm`, `yaml`, `kubernetes`, `dockerfile`, `script`, `rbac`, `secret_ref`, `network` (정본: DATABASE.md `findings.target_type`) |
 | `target_name` | 파일, 이미지, Kubernetes 리소스, namespace/name |
 | `image_digest` | 이미지 대상이면 실제 digest |
 | `rule_id` | scanner rule ID, CVE ID, policy ID |
@@ -796,6 +834,8 @@ kube-sentinel/
 │   │   │   ├── sbom/                    # Priority 100
 │   │   │   ├── kubernetes_manifest/     # Priority 150
 │   │   │   ├── rbac_review/             # Priority 150
+│   │   │   ├── dockerfile_scan/         # Priority 150
+│   │   │   ├── script_scan/             # Priority 150
 │   │   │   ├── applied_cluster_config/  # Priority 200
 │   │   │   ├── secret_reference/        # Priority 200
 │   │   │   ├── trivy_operator_reports/  # Priority 200
@@ -848,14 +888,14 @@ kube-sentinel/
 | 마일스톤 | 내용 | 기간 | Exit Criteria |
 |---------|------|:---:|--------------|
 | **M0** | Assessment readiness checks | 1일 | Mgmt namespace, kubeconfig Secret, target namespace, read-only RBAC, image access, report store write 확인 |
-| **M0.5** | 납품 산출물 보안 점검 베이스라인 | 1일 | artifact input manifest, scanner baseline, SAST/Secret/Image/SBOM/무결성/Manifest/RBAC/Dockerfile/Script report 생성 |
+| **M0.5** | 납품 산출물 보안 점검 베이스라인 | 1일 | artifact input manifest, scanner baseline, SAST/Secret/Manifest/RBAC/Dockerfile/Script report 생성·scan health 검증. Image/SBOM/무결성은 placeholder만(실제 생성은 M5) |
 | **M1** | Report Store + Dashboard backend | 1~2일 | PostgreSQL `raw_reports`/`findings`, scan health, final decision 기록, evidence bundle 저장과 기본 dashboard 조회 |
 | **M2** | Mgmt Controller Core + Security Assessment Scaffold | 3~4일 | CRD, registry, desired state store, remote apply, SSA, finalizer, report writer, assessment scaffold 동작 |
 | **M3** | Security Assessment Feature 상세 구현 | 2~3일 | 산출물 scanner 실행, normalized finding, scan health 생성 |
 | **M4** | Applied Cluster Configuration Scan | 2일 | Biz Cluster read-only 조회로 Workload/RBAC/Secret 참조 finding 생성 |
 | **M5** | Trivy Feature + 이미지/SBOM/무결성 점검 | 2일 | 납품 이미지 CVE/SBOM/digest 결과와 optional VulnerabilityReport 정규화 |
 | **M6** | Optional Inventory/Telemetry Extension | 선택 | OSQuery, OTel/LGTM, runtime telemetry는 별도 설계 승인 후 진행 |
-| **M7** | Final Check Dashboard | 2~3일 | Overview, Targets, Assessments, Findings(6 보안 도메인 탭), Reports, 예외 관리(Governance) 메뉴 조회 |
+| **M7** | Final Check Dashboard | 2~3일 | Overview, Targets, Assessments, Findings(5 보안 도메인 탭), Reports, 예외 관리(Governance) 메뉴 조회 |
 | **M8** | Final-check validation | 1일 | 최종 보고서, Secret redaction, exception status, evidence bundle, no-auto-remediation guardrail 확인 |
 | **M9** | AI remediation advisor (선택) | 선택 | 기본 OFF opt-in. ON 시 advisory sidecar·provenance·redaction·`scan_health=Warning` (reason=`ai_advisor_unavailable`) 생성, AI ON/OFF 판정 동일. 상세는 [AI_REMEDIATION.md](./AI_REMEDIATION.md) |
 

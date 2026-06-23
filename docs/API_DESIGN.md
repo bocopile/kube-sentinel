@@ -251,9 +251,10 @@ upsert) 결과 id를 반환한다.
 }
 ```
 
-**응답 `400`:** assessment_name 없음, targets 참조 오류 또는 profiles enum 형식 오류.
-(reconcile 단계에서만 발견되는 unknown profile은 HTTP 400으로 중복 거부하지 않고 ScanRun `status.features[]`에
-`ConfigError`로 기록한 뒤 해당 profile만 무시한다.)
+**응답 `400`:** assessment_name 없음, targets 참조 오류, 또는 `profiles[]` enum 형식 오류.
+(`profiles[]`는 `ScanProfile` CRD enum이라 알 수 없는 값은 admission/400으로 거부된다. unknown→`ConfigError`는
+`profiles[]`가 아니라 free-form `features[].name`에서만 발생하며, 이 경우 400이 아니라 ScanRun `status.features[]`에
+`ConfigError`로 기록한 뒤 해당 feature만 무시한다.)
 
 ---
 
@@ -520,7 +521,7 @@ Artifact Store에 저장된 파일 목록.
       "artifact_type": "sbom",
       "path": "reports/final-check-20260618/scanrun-abc123/sbom/sha256-abc123.cyclonedx.json",
       "checksum": "sha256:cafebabe...",
-      "schema_version": "SPDX-2.3",
+      "schema_version": "CycloneDX-1.6",
       "scanner": "syft",
       "scanner_version": "1.4.0",
       "db_baseline_date": null,
@@ -562,6 +563,18 @@ Filesystem store의 경우 backend가 stream proxy로 동작한다.
 Filesystem store: `url`이 backend proxy 경로 (`/api/v1/artifacts/proxy/...`).
 
 **응답 `404`:** 해당 `artifactId` artifact 없음.
+
+---
+
+### GET /api/v1/artifacts/proxy/{artifactPath}
+
+Filesystem Artifact Store 전용 stream route. object store backend는 presigned `url`을 직접 반환하므로 이 route를
+사용하지 않는다. `GenerateDownloadURL`이 filesystem backend에서 반환한 `/api/v1/artifacts/proxy/...` 경로로 요청하면
+backend가 다른 API와 동일한 auth scope와 Secret redaction guard를 거쳐 artifact를 stream 응답한다.
+
+**응답 `200`:** artifact binary stream (`Content-Type`은 artifact_type에 따른다).
+
+**응답 `404`:** 경로에 해당하는 artifact 없음.
 
 ---
 

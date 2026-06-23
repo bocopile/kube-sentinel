@@ -114,7 +114,7 @@ operator/ 초기화 (operator/ 디렉터리 안에서):
 - Feature interface (ID, Priority, Validate, Preflight, Build, Collect, Normalize),
   feature registry, priority-ordered orchestrator skeleton.
 - ArtifactStore interface (filesystem / S3-compatible plugin).
-- registry ordering, profile→feature resolution, `profiles[]`/`features[]` merge, unknown profile/unknown feature `ConfigError` validation unit test.
+- registry ordering, profile→feature resolution, `profiles[]`/`features[]` merge, unknown `features[].name` `ConfigError` validation unit test (`profiles[]`는 `ScanProfile` CRD enum이라 admission에서 거부됨).
 
 optional inventory, OTel, LGTM, runtime sensor, backend 모듈, frontend 모듈은
 아직 구현하지 않는다.
@@ -423,7 +423,7 @@ backend/ 범위:
 - docs/API_DESIGN.md 전체 엔드포인트 구현:
   GET  /api/v1/overview
   GET  /api/v1/cluster-targets, /cluster-targets/{name}
-  GET  /api/v1/scan-runs, POST /api/v1/scan-runs
+  GET  /api/v1/scan-runs, POST /api/v1/scan-runs, PATCH /api/v1/scan-runs/{id}/retry
   GET  /api/v1/scan-runs/{id}, /scan-runs/{id}/status
   GET  /api/v1/scan-runs/{id}/findings
   GET  /api/v1/scan-runs/{id}/findings/{findingId}
@@ -445,7 +445,7 @@ backend/ 범위:
 frontend/ 범위 (docs/FRONTEND_ARCHITECTURE.md 기준):
 
 - Next.js App Router (TypeScript + Tailwind).
-- 메뉴: Overview, Targets, Assessments, Findings, Reports, Governance.
+- 메뉴: Overview, Targets, Assessments, Findings(5 보안 도메인 탭), Reports, 예외 관리(Governance).
 - src/api/: docs/API_DESIGN.md 엔드포인트 호출 fetch wrapper.
 - src/types/: docs/API_DESIGN.md 응답 스키마 기반 TypeScript 타입 정의.
 - Finding 필터: severity, category (sast, secret, image_vulnerability, sbom,
@@ -453,7 +453,8 @@ frontend/ 범위 (docs/FRONTEND_ARCHITECTURE.md 기준):
   exception_status, scan_status, scanner, namespace.
 - 5초 polling: GET /api/v1/scan-runs/{id}/status.
 - Exception review drawer: status 전환 UI (Required → Requested → Approved/Rejected).
-- Evidence bundle 다운로드: /scan-runs/{id}/artifacts/evidence_bundle/download.
+- Evidence bundle 다운로드: artifacts 목록에서 evidence_bundle의 `artifactId`를 받아
+  GET /scan-runs/{id}/artifacts/{artifactId}/download (filesystem backend는 /api/v1/artifacts/proxy/... 경유).
 
 frontend는 k8s API와 직접 통신하지 않는다. backend API 경유만 허용.
 
