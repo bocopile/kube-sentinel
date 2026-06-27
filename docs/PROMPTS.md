@@ -89,7 +89,176 @@ runtime sensor, automatic remediation은 해당 milestone에 명시되지 않은
   operator: cd operator && go test ./... && go build ./...
   backend:  cd backend  && go test ./... && go build ./...
   frontend: cd frontend && npm run build && npm test
+
+공유 계약(Feature, ArtifactStore, ArtifactInput, ArtifactInputSpec,
+ScanHealthReason, RedactSecrets, ValidateArtifactInput)은 아래 "SHARED CONTRACTS"
+섹션의 정본 시그니처를 그대로 사용한다. 어떤 섹션도 이 심볼을 다른 시그니처로
+재정의·개명·메서드 변경하지 않는다(섹션 간 계약 드리프트 금지).
 ```
+
+---
+
+## SHARED CONTRACTS (정본 — 모든 섹션이 그대로 사용; 재정의·개명·메서드 변경 금지)
+
+아래 계약은 `docs/ARCHITECTURE.md`·`docs/DATABASE.md`를 정본으로 **1회만** 정의한다.
+어떤 milestone 섹션도 이 심볼을 다른 시그니처로 재선언하지 않는다 — 각 섹션은
+"SHARED CONTRACTS의 X를 사용한다"로 참조만 한다.
+
+### Feature (operator) — 정본: docs/ARCHITECTURE.md
+
+```go
+type Feature interface {
+    ID() string
+    Priority() int
+    Validate(ctx FeatureContext) []Condition
+    Preflight(ctx FeatureContext) []CheckResult
+    Build(ctx FeatureContext) DesiredState
+    Collect(ctx FeatureContext) []ArtifactRef
+    Normalize(ctx FeatureContext) []Finding
+}
+```
+
+각 scanner 기능은 Feature plugin으로 registry에 자기 등록한다. **`Reconcile`은 Feature가
+아니라 Reconciler 책임**(workflow/status/remote apply/GC). Feature에 `Name()`/`Reconcile()`
+메서드를 추가하지 않는다. registry ordering은 priority → feature ID 기준 deterministic.
+
+### ArtifactStore (operator) — 정본: docs/ARCHITECTURE.md
+
+```go
+type ArtifactStore interface {
+    PutArtifact(ctx context.Context, ref ArtifactRef, r io.Reader) error
+    GetArtifact(ctx context.Context, ref ArtifactRef) (io.ReadCloser, error)
+    ListArtifacts(ctx context.Context, prefix string) ([]ArtifactRef, error)
+    DeleteArtifact(ctx context.Context, ref ArtifactRef) error
+    GenerateDownloadURL(ctx context.Context, ref ArtifactRef) (string, error)
+}
+```
+
+backend는 읽기 전용 부분집합 `ArtifactReader`(GetArtifact/ListArtifacts/GenerateDownloadURL)만 사용.
+
+### ArtifactInput vs ArtifactInputSpec (서로 다른 개념 — 이름 분리)
+
+- **ArtifactInput** — 스캐너 입력 번들(P2 `artifact-input.example.yaml` backing):
+
+```go
+type ArtifactInput struct {
+    SourcePaths []string
+    Images      []string
+    Digests     []string
+    Manifests   []string // Helm/YAML
+    RBAC        []string
+    Dockerfiles []string
+    Scripts     []string
+}
+```
+
+- **ArtifactInputSpec** — CRD `SecurityAssessment.spec.artifactInput` 필드(P5; docs/ARCHITECTURE.md 표기):
+
+```go
+type ArtifactInputSpec struct {
+    Source   string // artifactStore | pvc | emptyDir
+    Ref      string
+    Checksum string // algo:hex
+}
+```
+
+두 타입은 별개다. P2는 `ArtifactInput`, P5는 `ArtifactInputSpec`를 사용한다(같은 이름 재사용 금지).
+
+### ScanHealthReason (단일 enum) — 정본: docs/DATABASE.md scan_health.reason
+
+```go
+type ScanHealthReason string
+
+const (
+    ScannerError             ScanHealthReason = "scanner_error"
+    UnsupportedTarget        ScanHealthReason = "unsupported_target"
+    MissingArtifact          ScanHealthReason = "missing_artifact"
+    StaleDB                  ScanHealthReason = "stale_db"
+    StaleRules               ScanHealthReason = "stale_rules"
+    RegistryPullFailure      ScanHealthReason = "registry_pull_failure"
+    RBACDenied               ScanHealthReason = "rbac_denied"
+    OptionalInputUnavailable ScanHealthReason = "optional_input_unavailable"
+    AIAdvisorUnavailable     ScanHealthReason = "ai_advisor_unavailable" // P11
+    AIOutputRejected         ScanHealthReason = "ai_output_rejected"     // P11
+)
+```
+
+### RedactSecrets (단일 시그니처)
+
+```go
+func RedactSecrets(record any) (any, error)
+```
+
+report/log/dashboard/artifact record를 받아 secret-shaped 값을 제거한 사본을 반환한다(저장·egress 전).
+P2/P3/P9/P11 모두 이 시그니처를 사용한다(`[]byte` 변형판 금지).
+
+### ValidateArtifactInput (단일)
+
+```go
+func ValidateArtifactInput(in ArtifactInput) error
+```
+
+필수 필드(SourcePaths/Images/Digests 중 하나 이상) 누락 시 `ErrMissingArtifact` 반환, 아니면 nil.
+반환형은 **`error` 단일**이다 — `([]ScanHealth, error)`처럼 scan-health를 함께 반환하도록 시그니처를 바꾸지 않는다.
+scan health 산출은 ValidateArtifactInput과 **분리된 별도 경로**(검증 실패를 scan_health=Warning/Error로 기록하는
+호출자/리포트 store 책임)다. P2/P5 모두 이 `error` 시그니처를 그대로 사용한다.
+CRD `ArtifactInputSpec` 검증은 별도 `ValidateArtifactInputSpec(in ArtifactInputSpec) error`
+또는 admission webhook으로 처리한다(`ValidateArtifactInput`를 ArtifactInputSpec용으로 재정의하지 않는다).
+
+### ExceptionReviewStatus (단일 상태머신) — 정본: docs/DATABASE.md `exception_reviews.status` / `findings.exception_status`
+
+```go
+type ExceptionReviewStatus string
+
+const (
+    StatusNone      ExceptionReviewStatus = "None"      // finding 기본값(아직 review row 없음); findings.exception_status 전용
+    StatusRequired  ExceptionReviewStatus = "Required"
+    StatusRequested ExceptionReviewStatus = "Requested"
+    StatusApproved  ExceptionReviewStatus = "Approved"  // time-bound (expires_at)
+    StatusRejected  ExceptionReviewStatus = "Rejected"
+    StatusExpired   ExceptionReviewStatus = "Expired"
+)
+```
+
+허용 전이(정본; 그 외 모든 (from,to)는 invalid → PATCH 시 409):
+`None → Required → Requested → Approved | Rejected`, 그리고 `Approved → Expired`(만료).
+상태값·이름·전이를 다르게 재선언하지 않는다(예: `ExceptionRequired`/`ExceptionRequested` 같은 prefix 금지).
+`exception_reviews` row는 {Required, Requested, Approved, Rejected, Expired}만 가진다(None은 finding 기본값일 뿐 review row 상태 아님).
+P9(backend 전이 강제)·P10(final-check)·관련 frontend 모두 **이 정본 ExceptionReviewStatus를 그대로 참조**한다.
+
+### Finding (정규화 finding) — 정본: security.finding/v1 = docs/DATABASE.md `findings` 테이블
+
+`Feature.Normalize`가 반환하고(`[]Finding`), report store가 PostgreSQL `findings`에 영속화하는 단일 정규화 타입.
+모든 섹션(P3 schema/validator, P6 applied-cluster, P7 trivy, P11 advisor)은 **이 정본을 그대로 참조**한다 —
+부분 집합·다른 필드명(예: ResourceKind/ResourceName)으로 재선언하지 않는다.
+
+```go
+type Finding struct {
+    FindingID         string // stable deterministic ID
+    Scanner           string
+    Category          string // sast|secret|image_vulnerability|sbom|integrity|kubernetes|rbac|secret_ref|network|dockerfile|script|scan_health
+    Severity          string // Critical|High|Medium|Low|Info
+    TargetType        string // source|image|helm|yaml|dockerfile|script|kubernetes|rbac|secret_ref|network
+    TargetName        string // 파일 경로 / 이미지 ref / k8s resource name
+    TargetCluster     string // Biz applied finding의 ClusterTarget; Code/Artifact finding은 ""
+    Namespace         string
+    ImageDigest       string // sha256:...
+    RuleID            string // CVE / semgrep rule / policy ID
+    Message           string
+    Remediation       string // static catalog (AI sidecar는 별도)
+    ScanStatus        string // Pass|Fail|Error|Skipped|Unsupported
+    Details           map[string]any // scanner 특화 추가 필드 (DB JSONB)
+}
+```
+
+영속화 전용 컬럼 `scan_run_id`·`raw_report_id`·`id`·`exception_required`·`exception_status`는 **report store가
+부여**한다(정규화 Finding 값에는 두지 않는다). `Finding`을 섹션마다 다른 struct로 재선언하지 않는다.
+
+### 공유 enum 참조 규칙 (재선언 금지)
+
+위 `ScanHealthReason`·`ExceptionReviewStatus`·`Finding`은 SHARED CONTRACTS 정본이다. 어떤 섹션도 같은 이름으로
+부분 집합·확장·다른 표기의 enum/상태/struct를 **재선언하지 않는다**. 기능별로 특정 reason code만 사용/방출하더라도
+"SHARED CONTRACTS의 ScanHealthReason 중 X, Y를 방출한다"처럼 **정본을 참조**만 한다(새 type/enum 선언 금지).
 
 ---
 
@@ -111,7 +280,7 @@ operator/ 초기화 (operator/ 디렉터리 안에서):
 - ClusterTargetStatus에 ObservedGeneration, Capabilities, Namespaces 포함
   (docs/PLAN.md ClusterTargetStatus 정의 참조).
 - 빈 controller reconciler skeleton.
-- Feature interface (ID, Priority, Validate, Preflight, Build, Collect, Normalize),
+- Feature interface (SHARED CONTRACTS 정본: ID, Priority, Validate, Preflight, Build, Collect, Normalize — Name()/Reconcile() 없음),
   feature registry, priority-ordered orchestrator skeleton.
 - ArtifactStore interface (filesystem / S3-compatible plugin).
 - registry ordering, profile→feature resolution, `profiles[]`/`features[]` merge, unknown `features[].name` `ConfigError` validation unit test (`profiles[]`는 `ScanProfile` CRD enum이라 admission에서 거부됨).
@@ -177,16 +346,18 @@ docs/ROADMAP.md S0.5/M0.5를 구현 대상으로 사용한다.
   format 규칙: docs/DATABASE.md raw_reports 테이블 scanner format 컬럼 참조
   (json/sarif/text 구분).
 - source path, image list, digest list, Helm/YAML, RBAC, Dockerfile, script를
-  선언하는 artifact-input.example.yaml.
+  선언하는 artifact-input.example.yaml (SHARED CONTRACTS **ArtifactInput** 구조 backing; 검증은 **ValidateArtifactInput**).
+  `ValidateArtifactInput`은 정본 시그니처 `func(in ArtifactInput) error`만 사용한다(반환형 변경·scan-health 병합 금지);
+  scan health 산출은 검증과 분리된 별도 경로로 기록한다.
 - scanner version과 vulnerability DB/rule baseline capture.
 - scripts/run-security-assessment.sh orchestration skeleton.
 - 승인 digest 비교를 위한 scripts/verify-image-digest.sh.
 - scanner 결과 정규화용 scripts/normalize-findings.sh placeholder.
 - missing artifact, unsupported target, scanner error, stale baseline,
   registry pull failure를 나타내는 scan health output.
-  scan_health reason 열거: scanner_error | unsupported_target |
-  missing_artifact | stale_db | stale_rules | registry_pull_failure |
-  rbac_denied | optional_input_unavailable (docs/DATABASE.md 참조).
+  scan_health reason은 SHARED CONTRACTS **ScanHealthReason** enum(정본 docs/DATABASE.md
+  scan_health.reason: scanner_error | unsupported_target | missing_artifact | stale_db |
+  stale_rules | registry_pull_failure | rbac_denied | optional_input_unavailable)을 사용.
 
 runtime event correlation, OSQuery, OTel/LGTM, automatic remediation은 구현하지
 않는다.
@@ -217,7 +388,7 @@ operator/ 범위:
 - Security Finding Schema (security.finding/v1)와 schema validator.
 - stable finding ID와 deduplication helper.
   finding_id 생성 규칙: docs/DATABASE.md findings 테이블 참조.
-- report, log, dashboard record, artifact 대상 Secret redaction guard.
+- report, log, dashboard record, artifact 대상 Secret redaction guard — SHARED CONTRACTS **RedactSecrets(record any) (any, error)**를 사용(`[]byte` 변형판 정의 금지).
 - evidence bundle export 구조.
 - PostgreSQL write: raw scanner output을 JSONB 또는 TEXT로 `raw_reports` 테이블에 저장하는
   raw_report writer (docs/DATABASE.md raw_reports 테이블 스키마 기준). normalized findings JSONL은
@@ -266,7 +437,7 @@ docs/ROADMAP.md의 M2를 구현한다.
 - Mgmt Cluster 단일 operator 기준 ClusterTarget, SecurityAssessment, ScanRun
   reconciler core.
 - finalizer handling.
-- feature registry와 Feature orchestrator integration.
+- feature registry와 Feature orchestrator integration. Feature는 SHARED CONTRACTS의 정본 인터페이스(ID/Priority/Validate/Preflight/Build/Collect/Normalize)를 그대로 사용한다. **Feature에 `Name()`/`Reconcile()`를 추가하지 않는다** — reconcile 로직은 이 섹션의 Reconciler 책임이며 Feature 인터페이스가 아니다.
 - desired state store.
 - ClusterTarget kubeconfigRef를 사용하는 remote apply client skeleton.
 - bootstrapPolicy handling: 허용 namespace/RBAC/scanner resource 생성.
@@ -301,14 +472,14 @@ docs/ROADMAP.md의 M3, Security Assessment feature를 구현한다.
 
 - security_assessment feature config default와 validation.
 - Code / Artifact delivery scan을 위한 **Mgmt-local** Assessment Job resource (Biz Cluster 미생성).
-- `artifactInput` preflight·checksum 검증과 artifact-fetch init container의 `emptyDir`/PVC/Artifact Store fetch staging.
+- CRD `SecurityAssessment.spec.artifactInput`(SHARED CONTRACTS **ArtifactInputSpec**) preflight·checksum 검증과 artifact-fetch init container의 `emptyDir`/PVC/Artifact Store fetch staging.
 - scanner config mount point와 report output convention. raw report는 PostgreSQL `raw_reports`에 저장(Artifact Store에 raw canonical 경로 없음).
   raw scanner output을 PostgreSQL raw_reports 테이블에 저장
   (docs/DATABASE.md format 컬럼 규칙 준수: json/sarif/text).
 - finding normalization invocation.
 - scanner failure와 missing artifact에 대한 scan health reporting.
-  reason enum: docs/DATABASE.md scan_health 테이블 참조.
-- `SecurityAssessment.spec.artifactInput` validation 및 artifact input manifest validation.
+  reason은 SHARED CONTRACTS **ScanHealthReason** enum(정본 docs/DATABASE.md scan_health.reason)을 사용.
+- CRD `ArtifactInputSpec` validation(`ValidateArtifactInputSpec` 또는 admission webhook). 스캐너 입력 번들 검증은 SHARED CONTRACTS **ValidateArtifactInput(ArtifactInput)**을 사용 — 두 검증을 한 함수로 합치지 않는다.
 - scanner baseline capture → artifact_index 테이블 기록.
 
 optional inventory, Trivy delivery image scan, applied cluster configuration
@@ -342,6 +513,8 @@ docs/ROADMAP.md의 M4, applied cluster configuration scan을 구현한다.
   finding category: network.
 - namespace allowlist validator.
 - applied configuration risk에 대한 normalized finding → findings 테이블 insert.
+  정규화 finding은 SHARED CONTRACTS의 **Finding** 정본 타입을 **그대로** 사용한다 — 섹션 전용 struct를
+  새로 선언하거나 필드를 추가·삭제·개명하지 않는다(Category 등 값 집합만 이 도메인에 해당하는 부분을 사용).
 
 optional inventory, runtime sensor, automatic remediation은 구현하지 않는다.
 
@@ -376,6 +549,8 @@ docs/ROADMAP.md의 M5, Trivy delivery image scan과 image integrity를 구현한
 - deterministic finding ID:
   imageRepository/imageDigest/vulnerabilityID/packageName
   (docs/DATABASE.md findings finding_id 생성 규칙 참조).
+- 정규화 출력은 SHARED CONTRACTS의 **Finding** 정본 타입을 **그대로** 사용한다 — 섹션 전용 struct를 새로
+  선언하거나 필드를 추가·삭제하지 않는다(`ScanRunID` 등 영속 전용 컬럼은 report store가 부여; Finding 값에 두지 않음).
 - direct Trivy scan과 optional VulnerabilityReport 간 duplicate-safe test.
 
 이 milestone에서 Trivy Operator를 설치하거나 운영하지 않는다.
@@ -441,6 +616,7 @@ backend/ 범위:
 - raw-report 응답 전 Secret redaction guard 재실행.
 - CORS middleware (frontend origin 허용).
 - exception status machine 강제 (PATCH /api/v1/exceptions/{id} 전환 규칙).
+  상태값·전이는 SHARED CONTRACTS **ExceptionReviewStatus** 정본을 그대로 참조한다(재선언·prefix 금지).
 
 frontend/ 범위 (docs/FRONTEND_ARCHITECTURE.md 기준):
 
@@ -485,7 +661,8 @@ docs/ROADMAP.md의 M8을 구현한다.
 - applied cluster configuration assessment validation.
 - Secret redaction validation.
 - evidence bundle과 exception review validation.
-  exception status machine: Required → Requested → Approved/Rejected → Expired.
+  상태값·전이는 SHARED CONTRACTS **ExceptionReviewStatus** 정본을 그대로 참조한다(재선언·prefix 금지):
+  `None → Required → Requested → Approved | Rejected`, `Approved → Expired`.
   docs/DATABASE.md exception_reviews 동기화 규칙 준수.
 - no-auto-remediation guardrail validation.
 - 예상 kubectl diff/get output과 final-check report output 문서화.
@@ -521,7 +698,8 @@ docs/AI_REMEDIATION.md와 docs/ROADMAP.md의 M9를 구현한다. 1차 선택 기
 - security.aiRemediation/v1 출력 schema 검증과 거부 시 static fallback.
 - artifact_index에 artifact_type='remediation_advisory' 기록.
   remediation-advisory sidecar와 provenance. core findings 테이블 불변.
-- scan_health reason: ai_advisor_unavailable | ai_output_rejected.
+- scan_health reason은 SHARED CONTRACTS **ScanHealthReason** 정본의 값 `AIAdvisorUnavailable`(ai_advisor_unavailable)·
+  `AIOutputRejected`(ai_output_rejected)를 **방출만** 한다 — 새 type/enum/reason 집합을 선언하지 않는다(정본 참조).
 - API/timeout/validation 실패 시 scan non-Fail, `scan_health=Warning` (reason=ai_advisor_unavailable).
 
 automatic remediation, severity/판정 변경, secret/sast/script 입력, Vertex AI,
