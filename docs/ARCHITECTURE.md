@@ -61,6 +61,7 @@ flowchart LR
         artifact_store["Report Artifact Store"]
         assessment_api["Assessment API"]
         dashboard["Dashboard"]
+        mgmt_scanners["Mgmt-local Code / Artifact Scanner Jobs"]
     end
 
     subgraph biz["Biz Cluster"]
@@ -68,7 +69,7 @@ flowchart LR
         bootstrap["Bootstrap Resources"]
         ns["Namespace"]
         rbac["Bootstrap RBAC"]
-        scanners["Scanner Jobs"]
+        remote_scanners["Optional Remote Scanner Job"]
     end
 
     target_cr --> controller
@@ -82,8 +83,10 @@ flowchart LR
     preflight -->|"Install allowed missing items"| bootstrap
     bootstrap --> ns
     bootstrap --> rbac
-    orchestrator -->|"Apply scan resources"| scanners
-    scanners -->|"Raw reports"| orchestrator
+    orchestrator -->|"Run Code / Artifact Scan"| mgmt_scanners
+    mgmt_scanners -->|"Raw reports"| orchestrator
+    orchestrator -->|"Apply optional scan resources"| remote_scanners
+    remote_scanners -->|"Raw reports"| orchestrator
     orchestrator -->|"Raw reports / normalized findings / decisions"| metadata_store
     orchestrator -->|"Evidence bundle / exports"| artifact_store
     artifact_store -->|"Artifact refs"| metadata_store
@@ -560,7 +563,7 @@ unknown `features[].name` 하나가 전체 scan을 실패시키지 않으며, �
 4. `ScanRun` 실행 context를 생성한다.
 5. `profiles[]`를 매핑 정본 표로 base set으로 확장하고 `features[]`(enable/disable·config override)와 병합해 enabled
    feature를 deterministic하게 resolve한 뒤, priority → feature ID 사전순으로 정렬한다.
-   unknown profile/feature는 `ConfigError`로 기록하고 제외한다.
+   unknown feature(free-form `features[].name`)는 `ConfigError`로 기록하고 제외한다. unknown `profiles[]`는 이미 admission에서 거부되어 이 단계에 도달하지 않는다.
    5.5.
    ScanRun `metadata.annotations`의 `security.kube-sentinel.io/retry-scope`(backend `PATCH
    /api/v1/scan-runs/{id}/retry`가 patch)가 있으면 부분 재실행 분기로 진입한다.
@@ -868,7 +871,7 @@ Each line must contain at least:
 }
 ```
 
-Artifact path convention:
+#### Artifact path convention
 
 raw scanner output은 PostgreSQL `raw_reports` 테이블에 저장하므로 `raw/` 경로는 Artifact Store에 없다.
 Artifact Store에는 SBOM, evidence bundle, human report, scanner baseline, artifact input manifest만

@@ -112,7 +112,7 @@
   SECURITY_ASSESSMENT는 Code/Artifact Scan을 "Mgmt Cluster Job/별도 runner/CI runner/검수 VM"으로 둠.
   소스/이미지 등 입력을 어느 runner로 어떻게 전달하는지(PVC/Git ref/init container) 미정의.
   (협의: "Biz remote Job과 정면 충돌"은 과장 → "runner placement + artifact input 전달 계약 미정의"로 축소.)
-- **합의 권고**: `SecurityAssessment`/`ScanRun` spec에 runner placement(`mgmt-local`|`biz-remote`) 필드 추가,
+- **합의 권고**: (초기 권고, 이후 폐기됨 — 위 "해결됨" 노트 참조) runner placement 필드 추가 권고는 폐기하고,
   artifact input 마운트/동기화 규약을 reconcile flow에 명시.
 
 ### [I-7] PLAN Security Finding Schema category enum이 secret_ref·network 누락

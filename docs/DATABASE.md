@@ -242,6 +242,10 @@ CREATE INDEX idx_scan_health_scanrun ON scan_health(scan_run_id);
 CREATE INDEX idx_scan_health_status  ON scan_health(scan_run_id, status);
 ```
 
+`scan_health` 테이블이 scanner 실행 상태(OK/Warning/Fail/Skipped)의 단일 정본이다.
+`findings.category='scan_health'`는 동일 이벤트를 findings 조회 편의를 위해 1:1 미러링한 것이다.
+동일 `scan_run_id`/`scanner`/`reason`/`target_name` 이벤트에 대해 두 레코드는 같은 `status`/`reason`/`message`를 유지한다.
+
 ---
 
 ### exception_reviews
@@ -296,7 +300,9 @@ CREATE INDEX idx_exceptions_scanrun    ON exception_reviews(scan_run_id);
   `Approved` row를 `status='Expired'`로 전환하고 `findings.exception_status`도 같은 트랜잭션에서 갱신한다
   (backend cron이나 별도 worker가 아니라 operator가 단일 write 주체다).
 
-재스캔 carry-over 규칙(같은 `finding_id`가 새 ScanRun에서 다시 보고될 때, operator가 적용):
+#### 재스캔 carry-over 규칙
+
+같은 `finding_id`가 새 ScanRun에서 다시 보고될 때, operator가 적용:
 
 - 직전 ScanRun에서 `Approved`이고 `expires_at`이 아직 유효하면 새 finding의 `exception_status`를 `Approved`로
   carry-over하고 `exception_reviews` row(owner/reason/expires_at/approved_by/approved_at)를 같은

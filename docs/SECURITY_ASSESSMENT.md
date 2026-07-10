@@ -39,8 +39,8 @@
 
 | 구성요소 | 역할 | 현재 버전 사용 방식 |
 |----------|------|------------------|
-| SonarQube | 소스코드 정적분석, code smell, security hotspot | Findings의 소스 저장소 탭에 연계 |
-| Semgrep/gosec | 보안 취약 패턴과 위험 코드 탐지 | SonarQube 보완 scanner로 사용 |
+| SonarQube | 소스코드 정적분석, code smell, security hotspot | 선택적 외부 통합(optional); portable baseline은 Semgrep/gosec |
+| Semgrep/gosec | 보안 취약 패턴과 위험 코드 탐지 | SonarQube 미도입 시에도 사용하는 기본(portable) baseline scanner |
 | Secret Scanner | 하드코딩 Secret, Token, 계정 정보 탐지 | Gitleaks 기준으로 source, values, YAML, script 검사 |
 | Trivy/Grype | 컨테이너 이미지 CVE 및 Critical 취약점 탐지 | Findings의 컨테이너 이미지 탭에 집계 |
 | Trivy Operator | Biz Cluster에 적용된 workload image 취약점 확인 | 현재 선택 입력. CRD와 read-only 권한이 있을 때 `VulnerabilityReport`를 보조 증적으로 정규화 |
