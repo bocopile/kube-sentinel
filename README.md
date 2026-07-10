@@ -34,6 +34,8 @@ remote apply/read-only 방식으로 검사합니다.
 - Kubebuilder controller skeleton
 - 실제 Feature registry 및 plugin 구현체
 
+## 다음 구현 단계
+
 첫 구현 블록에서는 `operator/` Go module과 Kubebuilder skeleton을 만들고, `ClusterTarget`, `SecurityAssessment`,
 `ScanRun` API 및 Feature registry interface를 추가할 예정입니다.
 
@@ -48,6 +50,9 @@ remote apply/read-only 방식으로 검사합니다.
 5. [docs/DATABASE.md](docs/DATABASE.md)
 6. [docs/API_DESIGN.md](docs/API_DESIGN.md)
 7. [docs/ROADMAP.md](docs/ROADMAP.md)
+8. [docs/SECURITY_ASSESSMENT.md](docs/SECURITY_ASSESSMENT.md)
+9. [docs/ASSESSMENT_SUPPORT_FEATURES.md](docs/ASSESSMENT_SUPPORT_FEATURES.md)
+10. [docs/FRONTEND_ARCHITECTURE.md](docs/FRONTEND_ARCHITECTURE.md)
 
 ## 예상 모듈 구조
 

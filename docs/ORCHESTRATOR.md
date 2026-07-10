@@ -55,18 +55,26 @@ go test ./...
 go build ./...
 cd ..
 
-# 2. backend 모듈 초기화 (최초 1회)
+# 2. orchestrator 초기화 (root에서)
+orchestrator init --project . --yes
+```
+
+backend/frontend 모듈은 첫 구현 블록이 아니라 각 milestone 시점에 초기화한다.
+
+M1(backend)/M7(frontend) 시점에 실행:
+
+```bash
+# backend 모듈 초기화 (M1 시점)
+mkdir -p backend
 cd backend/
 go mod init github.com/bocopile/kube-sentinel/backend
 cd ..
 
-# 3. frontend 모듈 초기화 (최초 1회)
+# frontend 모듈 초기화 (M7 시점)
+mkdir -p frontend
 cd frontend/
 npm create next-app@latest . --typescript --tailwind --app
 cd ..
-
-# 4. orchestrator 초기화 (root에서)
-orchestrator init --project . --yes
 ```
 
 이미 초기화된 repo에서 생성 파일을 확인하지 않고 Kubebuilder command를 두 번 실행하지 않는다.
