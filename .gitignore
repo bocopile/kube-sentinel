@@ -36,6 +36,9 @@ go.work.sum
 .idea/
 .claude/
 
+# local git worktrees for isolated AI-assisted work (never a source of truth)
+.worktree/
+
 # pptx — 양식/산출물 바이너리 (sample.pptx는 C 단계에서 tools/pptx/template/로 이동 예정)
 *.pptx
 !tools/pptx/template/sample.pptx
