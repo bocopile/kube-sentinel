@@ -21,13 +21,13 @@ PoC는 수직 slice 단계로 구현한다.
 | --- | --- | ---: | --- |
 | M0 | Assessment readiness check | 1일 | Mgmt namespace, Biz Cluster kubeconfig Secret, target preflight, bootstrap policy, read-only RBAC, image access, report store write test 통과 |
 | M0.5 | Delivery artifact security assessment baseline | 1일 | required artifact, artifact input manifest, scanner version, vulnerability DB baseline, image access, digest list, scan health report 검증 |
-| M1 | Report store와 dashboard backend | 1-2일 | PostgreSQL `raw_reports`/`findings`, stable ID가 있는 normalized finding, metadata index, Artifact Store backend plugin, scan health, final decision record, evidence bundle, 기본 dashboard retrieval view 동작 |
+| M1 | Report store와 dashboard/API backend | 1-2일 | PostgreSQL `raw_reports`/`findings`, stable ID가 있는 normalized finding, metadata index, Artifact Store backend plugin, scan health, final decision record, evidence bundle, auth middleware skeleton, 기본 dashboard retrieval API 동작 |
 | M2 | Mgmt operator core + Feature orchestrator scaffold | 3-4일 | ClusterTarget/SecurityAssessment/ScanRun CRD, feature registry, feature orchestrator, desired state store, remote apply, bootstrap policy, SSA, finalizer, report writer, assessment scaffold 동작 |
 | M3 | Security Assessment feature | 2-3일 | delivery artifact scanner report가 scan health를 포함한 normalized finding으로 변환 |
 | M4 | Applied cluster configuration scan | 2일 | read-only cluster inspection이 Workload, RBAC, ServiceAccount, Secret reference 위험을 보고 |
 | M5 | Trivy feature + image integrity | 2일 | delivery image CVE/SBOM/digest finding과 optional Trivy Operator `VulnerabilityReport` 입력이 중복 finding ID 없이 정규화 |
 | M6 | Optional telemetry/inventory extension | 선택 | Phase 2 전용. OTel/LGTM/OSQuery/runtime telemetry는 별도 설계 검토 후 도입 |
-| M7 | Final-check dashboard | 2-3일 | Overview, Targets, Assessments, Findings, Reports, Governance 메뉴 캡처 |
+| M7 | Final-check dashboard | 2-3일 | login/session guard, 역할별 action visibility, Overview, Targets, Assessments, Findings, Reports, Governance 메뉴 캡처 |
 | M8 | Final-check validation | 1일 | delivery artifact scan, applied cluster configuration scan, report generation, Secret redaction, exception status, evidence bundle, no-auto-remediation guardrail end-to-end 검증 |
 | M9 | AI remediation advisor (선택) | 선택 | 기본 OFF opt-in. ON 시 redaction·advisory sidecar·provenance·`scan_health=Warning` (reason=`ai_advisor_unavailable`) 생성, AI ON/OFF 판정 동일. 상세는 [AI_REMEDIATION.md](./AI_REMEDIATION.md) |
 
