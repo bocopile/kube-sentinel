@@ -1,0 +1,28 @@
+{
+ "Week": "2026-07-14",
+ "LastWeek": "",
+ "X": 0.517234608458784,
+ "Programs": [
+  {
+   "Program": "cmd/go",
+   "Version": "go1.26.1",
+   "GoVersion": "go1.26.1",
+   "GOOS": "darwin",
+   "GOARCH": "arm64",
+   "Counters": {
+    "go/cgo:enabled": 2,
+    "go/goroot:other": 2,
+    "go/invocations": 2,
+    "go/mode:module": 2,
+    "go/platform/host/darwin/major-version:25": 2,
+    "go/platform/host/darwin/version:25-3": 2,
+    "go/platform/target/goarch:arm64": 2,
+    "go/platform/target/goarm64:v8.0": 2,
+    "go/platform/target/goos:darwin": 2,
+    "go/subcommand:version": 2
+   },
+   "Stacks": {}
+  }
+ ],
+ "Config": "v0.0.0-0"
+}
