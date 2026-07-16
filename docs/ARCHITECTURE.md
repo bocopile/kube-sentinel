@@ -22,6 +22,7 @@ Mgmt Cluster의 주요 구성:
   - Feature orchestrator
   - Feature plugin registry
 - Dashboard / API
+- Authn/Authz middleware
 - Metadata DB
 - Artifact Store abstraction
 
@@ -400,8 +401,36 @@ spec:
 | Report store | Stores raw reports, normalized findings, scan health, and final decisions in PostgreSQL; evidence bundles and other artifacts live in the Artifact Store. |
 | Report metadata store | Stores queryable ScanRun, raw_reports, Finding, ScanHealth, FinalDecision, ExceptionReview, and artifact index records for dashboard/API retrieval. |
 | Report artifact store | Stores SBOMs, digest reports, scanner baselines, artifact input manifests, exported reports, and evidence bundles. raw scanner reports and normalized findings are stored in PostgreSQL, not here. |
-| Assessment API | Reads report metadata and artifact references for dashboard, report download, and review workflows. |
-| Dashboard model | Provides one Final Check Dashboard with Overview, Targets, Assessments, Findings, Reports, and Governance views. |
+| Authn/Authz middleware | Validates a login session, bearer token, or trusted reverse-proxy identity on every backend request and resolves it to a `viewer`/`operator`/`approver`/`admin` role (§Dashboard/API backend and auth boundary). |
+| Assessment API | Authenticated API that reads report metadata and artifact references, and accepts scan/exception actions, for dashboard, report download, and review workflows. |
+| Dashboard model | Provides one Final Check Dashboard with Overview, Targets, Assessments, Findings, Reports, and Governance views, gated by the same role model as the API. |
+
+## Dashboard/API backend and auth boundary
+
+Final Check Dashboard는 정적 report viewer가 아니라 authenticated `backend` API(§API_DESIGN.md) 뒤의
+read model을 조회하는 제품 화면으로 둔다. PoC 단계 인증 수단은 `API_DESIGN.md` §구현 노트의 bearer
+token 또는 IP allowlist 중 하나를 선택할 수 있지만, 어느 쪽을 쓰든 dashboard/API는 인증되지 않은
+사용자에게 target, finding, report artifact, kubeconfig metadata를 노출하지 않는다.
+
+Required backend capabilities:
+
+| Capability | Minimum behavior |
+| --- | --- |
+| Authentication | Login session, bearer token, 또는 신뢰된 reverse-proxy identity 중 하나를 검증한다. |
+| Authorization | `viewer`, `operator`, `approver`, `admin` 역할을 구분한다. |
+| Read API | `ClusterTarget`, `ScanRun`, finding, scan health, final decision, exception, report artifact metadata를 filter/page/sort로 조회한다(엔드포인트 정본은 [API_DESIGN.md](./API_DESIGN.md)). |
+| Artifact download | Raw report, SBOM, final report, evidence bundle download는 artifact reference와 Secret redaction guard를 재검증한 뒤 backend가 제공한다. |
+| Scan action API | `POST /api/v1/scan-runs`, retry/resume, profile 실행 요청은 `operator` 이상으로 제한한다. |
+| Exception workflow | `PATCH /api/v1/exceptions/{id}` 승인/만료/반려는 `approver` 이상으로 제한하고 audit field를 남긴다. |
+
+Authorization rules:
+
+- `viewer`는 dashboard 조회와 report/evidence download만 수행한다.
+- `operator`는 scan 실행, retry/resume, target preflight 요청을 수행할 수 있다.
+- `approver`는 exception review 상태를 변경할 수 있다.
+- `admin`은 user/role mapping, backend auth 설정, retention policy를 관리한다.
+- 어떤 역할도 kubeconfig Secret value 또는 raw Secret value를 API 응답으로 받을 수 없다(기존 Secret
+  redaction guard와 동일 경계).
 
 ## Assessment reliability layer
 

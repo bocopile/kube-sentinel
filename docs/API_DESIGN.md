@@ -51,29 +51,51 @@ list 엔드포인트는 offset/limit 기반 페이지네이션을 사용한다.
 
 모든 timestamp는 RFC 3339 UTC (`2026-06-18T12:34:56Z`).
 
+### 인증/인가
+
+모든 엔드포인트는 `Authn/Authz middleware`([ARCHITECTURE.md](./ARCHITECTURE.md) §Dashboard/API backend
+and auth boundary)를 통과해야 한다. 인증 수단은 §구현 노트의 bearer token 또는 IP allowlist(PoC 단계)를
+따르되, 어느 쪽이든 요청은 `viewer`/`operator`/`approver`/`admin` 중 하나의 역할로 해석된다. 인증되지
+않은 요청은 `401 UNAUTHENTICATED`, 역할이 부족한 요청은 `403 FORBIDDEN`을 반환한다.
+
+| HTTP Status | 코드 | 조건 |
+|-------------|------|------|
+| `401` | `UNAUTHENTICATED` | 세션/토큰이 없거나 검증 실패 |
+| `403` | `FORBIDDEN` | 인증은 됐으나 역할이 해당 엔드포인트를 수행하기에 부족 |
+
+역할별 허용 범위는 아래 "엔드포인트 목록"의 "필요 역할" 컬럼이 정본이며, 요약하면:
+
+- `viewer`: 모든 GET 엔드포인트(조회·다운로드)
+- `operator`: `viewer` 권한 + scan 생성/재실행(`POST /scan-runs`, `PATCH /scan-runs/{id}/retry`)
+- `approver`: `viewer` 권한 + 예외 상태 전환(`PATCH /exceptions/{id}`)
+- `admin`: 이 문서의 엔드포인트 범위 밖(user/role mapping, backend auth 설정, retention 관리)
+
+`raw-report`/`artifacts/.../download` 응답은 역할 검증을 통과한 뒤에도 기존 Secret redaction guard를
+재적용한다(§구현 노트 raw-report 접근 제한 참조) — 인증/인가는 redaction을 대체하지 않는다.
+
 ---
 
 ## 엔드포인트 목록
 
-| 메서드 | 경로 | 요약 |
-|--------|------|------|
-| GET | `/api/v1/overview` | 전체 요약 (카운터, 최근 scan) |
-| GET | `/api/v1/cluster-targets` | ClusterTarget 목록 |
-| GET | `/api/v1/cluster-targets/{name}` | ClusterTarget 단건 |
-| GET | `/api/v1/scan-runs` | ScanRun 목록 |
-| POST | `/api/v1/scan-runs` | ScanRun 생성 (trigger) |
-| PATCH | `/api/v1/scan-runs/{id}/retry` | ScanRun workflow 부분 재실행 (trigger) |
-| GET | `/api/v1/scan-runs/{id}` | ScanRun 단건 |
-| GET | `/api/v1/scan-runs/{id}/status` | phase 폴링 (5초 주기) |
-| GET | `/api/v1/scan-runs/{id}/findings` | finding 목록 (필터/페이지) |
-| GET | `/api/v1/scan-runs/{id}/findings/{findingId}` | finding 단건 |
-| GET | `/api/v1/scan-runs/{id}/findings/{findingId}/raw-report` | raw scanner 출력 |
-| GET | `/api/v1/scan-runs/{id}/health` | scan health 기록 |
-| GET | `/api/v1/scan-runs/{id}/artifacts` | artifact 목록 |
-| GET | `/api/v1/scan-runs/{id}/artifacts/{artifactId}/download` | artifact 다운로드 URL |
-| GET | `/api/v1/exceptions` | 예외 검토 목록 |
-| PATCH | `/api/v1/exceptions/{id}` | 예외 상태 전환 |
-| GET | `/api/v1/governance/summary` | 거버넌스 요약 |
+| 메서드 | 경로 | 요약 | 필요 역할 |
+|--------|------|------|----------|
+| GET | `/api/v1/overview` | 전체 요약 (카운터, 최근 scan) | viewer |
+| GET | `/api/v1/cluster-targets` | ClusterTarget 목록 | viewer |
+| GET | `/api/v1/cluster-targets/{name}` | ClusterTarget 단건 | viewer |
+| GET | `/api/v1/scan-runs` | ScanRun 목록 | viewer |
+| POST | `/api/v1/scan-runs` | ScanRun 생성 (trigger) | operator |
+| PATCH | `/api/v1/scan-runs/{id}/retry` | ScanRun workflow 부분 재실행 (trigger) | operator |
+| GET | `/api/v1/scan-runs/{id}` | ScanRun 단건 | viewer |
+| GET | `/api/v1/scan-runs/{id}/status` | phase 폴링 (5초 주기) | viewer |
+| GET | `/api/v1/scan-runs/{id}/findings` | finding 목록 (필터/페이지) | viewer |
+| GET | `/api/v1/scan-runs/{id}/findings/{findingId}` | finding 단건 | viewer |
+| GET | `/api/v1/scan-runs/{id}/findings/{findingId}/raw-report` | raw scanner 출력 | viewer |
+| GET | `/api/v1/scan-runs/{id}/health` | scan health 기록 | viewer |
+| GET | `/api/v1/scan-runs/{id}/artifacts` | artifact 목록 | viewer |
+| GET | `/api/v1/scan-runs/{id}/artifacts/{artifactId}/download` | artifact 다운로드 URL | viewer |
+| GET | `/api/v1/exceptions` | 예외 검토 목록 | viewer |
+| PATCH | `/api/v1/exceptions/{id}` | 예외 상태 전환 | approver |
+| GET | `/api/v1/governance/summary` | 거버넌스 요약 | viewer |
 
 ---
 
@@ -787,8 +809,9 @@ backend는 enum/참조 값 검증만 하고, 실제 병합·resolve와 unknown f
   `POST /api/v1/scan-runs`에서 ScanRun CR apply 시 사용
 - **CORS**: `frontend` origin 허용.
   backend middleware로 처리
-- **인증**: PoC 단계에서는 bearer token 또는 IP allowlist.
-  문서에 추후 정책 명시
+- **인증**: PoC 단계에서는 bearer token 또는 IP allowlist 중 하나로 요청을 인증한다.
+- **인가**: 인증된 요청을 `viewer`/`operator`/`approver`/`admin` 역할로 해석하는 middleware.
+  역할별 허용 범위와 실패 응답(`401`/`403`)은 §인증/인가, 엔드포인트별 필요 역할은 §엔드포인트 목록 정본.
 - **SSE**: `GET /api/v1/scan-runs/{id}/status` 는 현재 polling.
   Phase 2에서 SSE로 교체 예약
 - **raw-report 접근 제한**: dashboard에서 raw scanner 출력을 직접 렌더링할 때 Secret redaction guard를 통과한 데이터만 응답한다.

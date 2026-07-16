@@ -896,13 +896,13 @@ kube-sentinel/
 |---------|------|:---:|--------------|
 | **M0** | Assessment readiness checks | 1일 | Mgmt namespace, kubeconfig Secret, target namespace, read-only RBAC, image access, report store write 확인 |
 | **M0.5** | 납품 산출물 보안 점검 베이스라인 | 1일 | artifact input manifest, scanner baseline, SAST/Secret/Manifest/RBAC/Dockerfile/Script report 생성·scan health 검증. Image/SBOM/무결성은 placeholder만(실제 생성은 M5) |
-| **M1** | Report Store + Dashboard backend | 1~2일 | PostgreSQL `raw_reports`/`findings`, scan health, final decision 기록, evidence bundle 저장과 기본 dashboard 조회 |
+| **M1** | Report Store + Dashboard/API backend | 1~2일 | PostgreSQL `raw_reports`/`findings`, scan health, final decision 기록, evidence bundle 저장, auth middleware skeleton과 기본 dashboard API 조회 |
 | **M2** | Mgmt Controller Core + Security Assessment Scaffold | 3~4일 | CRD, registry, desired state store, remote apply, SSA, finalizer, report writer, assessment scaffold 동작 |
 | **M3** | Security Assessment Feature 상세 구현 | 2~3일 | 산출물 scanner 실행, normalized finding, scan health 생성 |
 | **M4** | Applied Cluster Configuration Scan | 2일 | Biz Cluster read-only 조회로 Workload/RBAC/Secret 참조 finding 생성 |
 | **M5** | Trivy Feature + 이미지/SBOM/무결성 점검 | 2일 | 납품 이미지 CVE/SBOM/digest 결과와 optional VulnerabilityReport 정규화 |
 | **M6** | Optional Inventory/Telemetry Extension | 선택 | OSQuery, OTel/LGTM, runtime telemetry는 별도 설계 승인 후 진행 |
-| **M7** | Final Check Dashboard | 2~3일 | Overview, Targets, Assessments, Findings(5 보안 도메인 탭), Reports, 예외 관리(Governance) 메뉴 조회 |
+| **M7** | Final Check Dashboard | 2~3일 | login/session guard, 역할별 action visibility, Overview, Targets, Assessments, Findings(5 보안 도메인 탭), Reports, 예외 관리(Governance) 메뉴 조회 |
 | **M8** | Final-check validation | 1일 | 최종 보고서, Secret redaction, exception status, evidence bundle, no-auto-remediation guardrail 확인 |
 | **M9** | AI remediation advisor (선택) | 선택 | 기본 OFF opt-in. ON 시 advisory sidecar·provenance·redaction·`scan_health=Warning` (reason=`ai_advisor_unavailable`) 생성, AI ON/OFF 판정 동일. 상세는 [AI_REMEDIATION.md](./AI_REMEDIATION.md) |
 
