@@ -1,6 +1,6 @@
 # Database Schema
 
-kube-sentinel은 PostgreSQL 18.x를 메타데이터 저장소로 사용한다.
+kube-sentinel은 PostgreSQL(`17.x` 이상, `18.x`를 권장·검증된 baseline으로 사용)을 메타데이터 저장소로 사용한다.
 모든 dashboard/API 쿼리는 이 DB에서 수행한다.
 raw scanner output도 `raw_reports` 테이블의 JSONB 컬럼에 저장한다.
 SBOM, evidence bundle, human report, scanner baseline은 Artifact Store(파일) 에 저장하고 `artifact_index`
@@ -387,8 +387,8 @@ CREATE INDEX idx_cluster_targets_env   ON cluster_targets(environment);
 - 파일 위치: `backend/internal/db/migrations/`
 - 명명 규칙: `YYYYMMDDHHMMSS_<description>.up.sql` / `.down.sql`
 - 운영 환경에서 `down` 마이그레이션은 수동 실행만 허용한다.
-- PostgreSQL 버전: `18.x` 권장.
-  `17.x` 이상에서 동작 확인 필요.
+- PostgreSQL 버전: `17.x` 이상 필요. `18.x`는 권장·검증된 baseline이다(docs/ARCHITECTURE.md
+  "Middleware and version baseline" 참고).
 
 ---
 

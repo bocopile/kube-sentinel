@@ -134,7 +134,7 @@ Do not treat floating tags such as `latest` as a valid final-check baseline.
 | Manifest rendering | Kustomize | `v5.8.1` validated | Optional render path for Kustomize-based delivery manifests. |
 | Utility CLI | `jq` | `1.8.1` validated | JSON report and status processing in scripts. |
 | Utility CLI | `yq` | `v4.53.3` validated | YAML manifest, Helm values, and artifact input processing. |
-| Result metadata | PostgreSQL | `18.x` recommended for product mode | Queryable index for ScanRun, Finding, FinalDecision, ExceptionReview, artifact metadata, and dashboard filters. |
+| Result metadata | PostgreSQL | `17.x` or newer required; `18.x` recommended/validated baseline for product mode | Queryable index for ScanRun, Finding, FinalDecision, ExceptionReview, artifact metadata, and dashboard filters. |
 | Result artifact | Artifact Store backend plugin | deployment-specific | SBOM, evidence bundle, scanner baseline, artifact-input manifest, exported human report 같은 파생·증적 산출물을 저장하는 추상화 계층. raw report와 normalized finding의 query 정본은 PostgreSQL이며 Artifact Store에 두지 않는다. 특정 backend에 고정하지 않는다. |
 
 ### First-scope scanner baseline

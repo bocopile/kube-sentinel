@@ -355,7 +355,7 @@ docs/PLAN.md, docs/REQUIREMENTS.md, docs/ARCHITECTURE.md,
 docs/ROADMAP.md, docs/MODULES.md를 project contract로 사용한다.
 
 이 프로젝트는 operator/, backend/, frontend/ 3개 모듈로 구성된 모노레포다.
-P0 산출물 범위는 docs/ROADMAP.md §첫 구현 블록을 단일 정본으로 따른다. P0에서는 operator/ 모듈 skeleton과 `.orchestrator/config.yaml`만 생성하고 backend/frontend는 초기화하지 않는다.
+P0 산출물 범위는 docs/ROADMAP.md §첫 구현 블록을 단일 정본으로 따른다. P0에서는 operator/ 모듈 skeleton만 생성하고 backend/frontend는 초기화하지 않는다. `.orchestrator/config.yaml`은 이미 존재·보호된 파일이라 P0 산출물에 포함되지 않는다(선행 조건은 docs/ROADMAP.md §첫 구현 블록 참고).
 
 operator/ 초기화 (operator/ 디렉터리 안에서):
 - Go module: github.com/bocopile/kube-sentinel/operator
@@ -560,7 +560,9 @@ docs/ROADMAP.md의 M3, Security Assessment feature를 구현한다.
 작업 디렉터리: operator/
 
 - security_assessment feature config default와 validation.
-- Code / Artifact delivery scan을 위한 **Mgmt-local** Assessment Job resource (Biz Cluster 미생성).
+- P4가 만든 security_assessment feature의 **Mgmt-local** Job/CronJob scaffold(Biz Cluster 미생성)를
+  재사용해 Code / Artifact delivery scan 실행에 필요한 scanner container/config/report wiring을 채운다
+  (Job/CronJob 리소스 자체는 P4 산출물이며 P5에서 다시 생성하지 않는다).
 - CRD `SecurityAssessment.spec.artifactInput`(SHARED CONTRACTS **ArtifactInputSpec**) preflight·checksum 검증과 artifact-fetch init container의 `emptyDir`/PVC/Artifact Store fetch staging.
 - scanner config mount point와 report output convention. raw report는 PostgreSQL `raw_reports`에 저장(Artifact Store에 raw canonical 경로 없음).
   raw scanner output을 PostgreSQL raw_reports 테이블에 저장
@@ -756,7 +758,10 @@ docs/ROADMAP.md의 M8을 구현한다.
 
 - Code / Artifact Scan, Biz Cluster Scan, Full Final Check를 위한 end-to-end
   validation asset.
-- disabled profile과 stale ScanRun에 대한 garbage collection verification.
+- disabled feature(target-scoped)와 완료·오래된 ScanRun(run-scoped)에 대한 label 기반 garbage
+  collection verification: `target + scan-run + feature + scope=run` selector로 run-scoped object만
+  정리하고, per-ScanRun cleanup이 target-scoped shared object(`scope=target`)를 삭제하지 않음을
+  검증한다(docs/ARCHITECTURE.md Ownership model 기준).
 - delivery artifact assessment validation.
 - applied cluster configuration assessment validation.
 - Secret redaction validation.
@@ -775,7 +780,8 @@ docs/ROADMAP.md의 M8을 구현한다.
 - cd backend  && go test ./... 통과.
 - cd backend  && go build ./... 통과.
 - validation script가 security_assessment와 trivy를 포함.
-- stale resource cleanup behavior가 문서화됨.
+- stale resource cleanup behavior가 target-scoped/run-scoped label selector와 삭제 제외 규칙
+  (target-scoped shared object는 per-ScanRun cleanup으로 삭제되지 않음)까지 문서화됨.
 - final-check report output이 scan health, evidence bundle reference, exception
   status, 자동 Biz Cluster infrastructure mutation 없음 정보를 포함.
 - GET /api/v1/governance/summary 응답이 decision_trend와 exception_summary를 포함.

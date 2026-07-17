@@ -46,7 +46,8 @@ PoC는 수직 slice 단계로 구현한다.
 - Artifact Store backend plugin interface
 - registry ordering, `profiles[]`/`features[]` merge, unknown profile/unknown feature validation
   unit test
-- `orchestrator init`으로 생성한 `.orchestrator/config.yaml`
+
+`.orchestrator/config.yaml`은 이 블록의 산출물이 아니다 — `orchestrator init`으로 이미 생성·커스터마이징(provider/consensus/trust5/selfHeal)돼 있고 `changeBudget.protectedPaths`로 보호돼 에이전트가 직접 쓸 수 없다. 이 블록이 실행되기 **전**, root go.mod 제거에 맞춰 `toolchain.test`/`toolchain.build`를 모듈 스코프(`cd operator && go test ./...` 등)로 갱신하는 것은 사람이 완료해야 하는 선행 조건이다.
 
 `backend/`/`frontend/` 모듈 디렉터리는 첫 블록 범위가 아니며 각각 후속 milestone에서 초기화한다.
 이후 S0과 S1을 진행한다.
