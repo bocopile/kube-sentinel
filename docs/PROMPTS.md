@@ -466,6 +466,10 @@ docs/DATABASE.md와 docs/MODULES.md를 구현 계약으로 사용한다.
 
 작업 디렉터리: operator/ (report/normalizer), backend/ (DB init, migration)
 
+선행 조건: P3에서 backend/ 모듈이 처음 생성되므로, `orchestrator run` 전 사람이 protected
+`.orchestrator/config.yaml`의 `toolchain.test`/`toolchain.build`를 operator+backend 검증으로
+재스코프한다(`.orchestrator`는 `changeBudget.protectedPaths`로 보호되어 에이전트가 직접 갱신할 수 없다).
+
 operator/ 범위:
 
 - Security Finding Schema (security.finding/v1)와 schema validator.
@@ -683,6 +687,13 @@ docs/ROADMAP.md의 M6를 구현한다.
 docs/ROADMAP.md M7, docs/FRONTEND_ARCHITECTURE.md, docs/API_DESIGN.md,
 docs/MODULES.md를 구현 대상으로 사용한다.
 작업 디렉터리: backend/ (REST API 완성), frontend/ (React SPA)
+
+선행 조건: `.orchestrator/config.yaml`은 `changeBudget.protectedPaths`로 보호돼 에이전트가 스스로 갱신할
+수 없다. P9 실행 전 사람이 `toolchain.test`/`toolchain.build`를 backend+frontend 검증까지 포함하도록
+재스코프한다. 또한 P9는 REST API 전체(docs/API_DESIGN.md 엔드포인트 목록)와 Next.js frontend 전체를
+포함해 기본 `changeBudget.maxFilesChanged: 50`/`maxTotalLines: 2000`을 초과할 가능성이 높으므로, 사람이
+changeBudget을 이 milestone 범위에 맞게 조정하거나 P9를 backend/frontend 두 개의 orchestrator 요청으로
+나눠 실행한다.
 
 backend/ 범위:
 
