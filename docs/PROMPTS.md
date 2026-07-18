@@ -572,6 +572,12 @@ docs/ROADMAP.md의 M3, Security Assessment feature를 구현한다.
   raw scanner output을 PostgreSQL raw_reports 테이블에 저장
   (docs/DATABASE.md format 컬럼 규칙 준수: json/sarif/text).
 - finding normalization invocation.
+- Code / Artifact manifest scanner 실행: Semgrep/gosec(`source_security`), Gitleaks(`secret_scan`),
+  kube-linter/conftest(`kubernetes_manifest`), Hadolint(`dockerfile_scan`), ShellCheck(`script_scan`),
+  manifest-side `rbac_review`(docs/ARCHITECTURE.md `KubernetesConfig` profile과 동일한 registered
+  feature — P6의 Biz Cluster `rbac_review`와 같은 feature ID이며 `target_cluster=NULL` finding_id
+  규칙으로 구분한다). raw output은 `raw_reports`에 저장하고 각 finding.category는
+  docs/ARCHITECTURE.md profile→feature ID 매핑을 따른다.
 - scanner failure와 missing artifact에 대한 scan health reporting.
   reason은 SHARED CONTRACTS **ScanHealthReason** enum(정본 docs/DATABASE.md scan_health.reason)을 사용.
 - CRD `ArtifactInputSpec` validation(`ValidateArtifactInputSpec` 또는 admission webhook). 스캐너 입력 번들 검증은 SHARED CONTRACTS **ValidateArtifactInput(ArtifactInput)**을 사용 — 두 검증을 한 함수로 합치지 않는다.
@@ -598,13 +604,27 @@ scan은 아직 구현하지 않는다.
 docs/ROADMAP.md의 M4, applied cluster configuration scan을 구현한다.
 작업 디렉터리: operator/
 
-- 승인 namespace에 대한 read-only Kubernetes client access.
-- securityContext, volume, image, ServiceAccount setting에 대한 workload spec
-  inspection.
+이 milestone은 단일 monolithic feature가 아니라 registry feature ID 3개로 구현한다(우선순위는
+docs/ARCHITECTURE.md feature registry 정본 참조):
+- `rbac_review`(priority 150): docs/ARCHITECTURE.md의 `KubernetesConfig` manifest workflow와 동일한
+  registered feature를 재사용한다(신규 Biz-only 구현 금지). Biz Cluster workflow에서는
+  `target_cluster=<name>` finding_id 규칙(docs/DATABASE.md)을 사용해 manifest-side finding과 구분한다.
+- `applied_cluster_config`(priority 200): applied workload/securityContext/volume/image inspection과
+  선택 Service/Ingress exposure inspection. categories: `kubernetes`, `network`.
+- `secret_reference`(priority 200): Secret raw value 없이 env/envFrom/volume/ServiceAccount token
+  reference inspection. category: `secret_ref`.
+
+- 승인 namespace에 대한 read-only Kubernetes client access. Secret `get/list/watch` 권한은 기본
+  부여하지 않으며(docs/ARCHITECTURE.md Biz Cluster remote apply resources 참조), Secret reference는
+  workload spec에서만 검사한다.
+- securityContext, volume, image setting에 대한 workload spec inspection.
+  finding category: kubernetes.
 - Role, RoleBinding, ClusterRole, ClusterRoleBinding risk에 대한 RBAC inspection.
-  finding category: rbac, secret_ref (docs/DATABASE.md findings.category 참조).
-- Secret raw value를 읽지 않는 Secret reference inspection.
-- 선택 warning category로 Service/Ingress exposure inspection.
+  finding category: rbac.
+- Secret raw value를 읽지 않는 env/envFrom/volume Secret reference 및 ServiceAccount token reference
+  inspection.
+  finding category: secret_ref.
+- 선택 warning finding으로 Service/Ingress exposure inspection.
   finding category: network.
 - namespace allowlist validator.
 - applied configuration risk에 대한 normalized finding → findings 테이블 insert.
