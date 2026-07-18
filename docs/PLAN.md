@@ -745,6 +745,9 @@ Reconcile()
   ├── 14. Feature.Collect() → raw report/artifact reference 수집
   ├── 15. Feature.Normalize() → finding/scan health 생성
   ├── 16. Code 결과와 Biz Cluster 결과 상관 분석 + final decision 확정
+  │      └── 직후 priority 250 post-decision enrichment feature(remediation_enrichment)의
+  │            Normalize()를 report_export 이전에 별도 실행 (findings.remediation/severity/
+  │            exception state/final decision 변경 금지, AI_REMEDIATION.md 참고)
   ├── 17. Evidence Bundle과 Exception Review 후보 생성
   ├── 18. PostgreSQL에 raw_reports/findings/scan_health/final decision 저장 후 Artifact Store에 evidence/export 산출물 저장
   ├── 19. label 기반 비활성 Feature/ScanRun remote GC

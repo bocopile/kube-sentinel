@@ -26,7 +26,7 @@ AI 실패는 scan과 최종 판정을 바꾸지 않는다.
 | No-auto-remediation | AI는 조치 가이드 텍스트만 생성한다. Biz Cluster 자동 수정, `kubectl apply`, PR/YAML patch 적용을 하지 않는다. |
 | Masking before egress | Gemini는 외부 egress다. 전송 전 field allowlist와 Secret redaction guard를 반드시 통과한다. |
 | Provenance | LLM 출력은 비결정적이므로 model, prompt template hash, masked-input hash, response hash, timestamp 등 출처를 기록한다. |
-| Failure isolation | API 오류/timeout/quota/검증 실패는 전체 scan 실패가 아니다. `scan_health=Warning` (reason=`ai_advisor_unavailable`)으로 기록하고 정적 catalog로 fallback한다. |
+| Failure isolation | API 오류/timeout/quota는 전체 scan 실패가 아니다: `scan_health=Warning` (reason=`ai_advisor_unavailable`)으로 기록한다. 출력 검증 실패는 해당 finding만 폐기한다: `scan_health=Warning` (reason=`ai_output_rejected`)으로 기록한다. 두 경우 모두 정적 catalog로 fallback하고 scan을 Fail로 바꾸지 않는다. |
 
 이 다섯 원칙은 [REQUIREMENTS.md](./REQUIREMENTS.md)의 Secret 미수집, no-auto-remediation, 재현성 요구와
 [SECURITY_ASSESSMENT.md](./SECURITY_ASSESSMENT.md)의 Decision Policy를 따른다.
